@@ -26,7 +26,16 @@ dotnet build
 dotnet run -- price BTC
 dotnet run -- history BTC --years 5 --currency usd --csv
 dotnet run -- trend
+dotnet run -- trx-monitor
+dotnet run -- trx-signal
 ```
+
+`trx-monitor` opens an input box for an AUD paper-investment amount, snapshots
+the entry price, and displays its estimated TRX value. It refreshes hourly and
+evaluates the 20-day moving-average, 2–3 red-day pullback, AUD support zones,
+green breakout, volume confirmation, stop, partial-profit, and final-exit
+rules. It does not place trades or use CoinSpot credentials.
+`trx-signal` prints the same current strategy assessment without opening the UI.
 
 Review an instant quote before placing a live order:
 

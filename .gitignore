@@ -1,4 +1,51 @@
-bin/
-obj/
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+artifacts/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.csproj.user
+*.vcxproj.user
+*.rsuser
+
+# Visual Studio Code / JetBrains
+.vscode/
+.idea/
+*.sln.iml
+
+# Test and coverage output
+TestResults/
+coverage/
+coverage.*
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+
+# Local logs and operating-system files
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Local secrets and generated exports
 .env
+.env.*
+!.env.example
+secrets.json
+appsettings.Local.json
 *.csv

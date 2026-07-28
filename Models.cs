@@ -1,6 +1,12 @@
 namespace CryptoTrader;
 
-public sealed record Candle(DateTimeOffset Time, decimal Open, decimal High, decimal Low, decimal Close);
+public sealed record Candle(
+    DateTimeOffset Time,
+    decimal Open,
+    decimal High,
+    decimal Low,
+    decimal Close,
+    decimal Volume = 0);
 
 public sealed record HistorySummary(
     string Coin,
@@ -23,3 +29,15 @@ public sealed record TrendResult(
     decimal Rsi14,
     string Trend,
     int Score);
+
+public sealed record TrxSignal(
+    string Action,
+    string Explanation,
+    decimal Price,
+    decimal MovingAverage20,
+    decimal AverageVolume20,
+    decimal Support,
+    int PullbackRedDays,
+    bool IsAboveMovingAverage,
+    bool HasGreenBreakout,
+    bool HasAboveAverageVolume);

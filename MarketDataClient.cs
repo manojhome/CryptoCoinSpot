@@ -10,7 +10,8 @@ public sealed class MarketDataClient(HttpClient http)
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["BTC"] = "bitcoin", ["ETH"] = "ethereum", ["XRP"] = "ripple",
-            ["USDT"] = "tether", ["SOL"] = "solana", ["USDC"] = "usd-coin"
+            ["USDT"] = "tether", ["SOL"] = "solana", ["USDC"] = "usd-coin",
+            ["TRX"] = "tron"
         };
 
     public async Task<IReadOnlyList<Candle>> GetDailyAsync(
@@ -57,6 +58,49 @@ public sealed class MarketDataClient(HttpClient http)
         var uri = $"{Root}/coins/{id}/market_chart?vs_currency={currency.ToLowerInvariant()}&days={days}";
         using var response = await GetWithRateLimitRetryAsync(uri, cancellationToken);
         return await ParseAndAggregateAsync(response, TimeSpan.FromHours(1), cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Candle>> GetRecentDailyAsync(
+        string coin, int days, string currency, CancellationToken cancellationToken)
+    {
+        if (days is < 21 or > 90) throw new ArgumentOutOfRangeException(nameof(days));
+        var id = ResolveId(coin);
+        var uri = $"{Root}/coins/{id}/market_chart?vs_currency={currency.ToLowerInvariant()}&days={days}";
+        using var response = await GetWithRateLimitRetryAsync(uri, cancellationToken);
+        var text = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"Market-data provider returned {(int)response.StatusCode}: {text}");
+        using var json = JsonDocument.Parse(text);
+
+        var volumes = json.RootElement.GetProperty("total_volumes").EnumerateArray()
+            .ToDictionary(x => x[0].GetInt64(), x => x[1].GetDecimal());
+        var points = json.RootElement.GetProperty("prices").EnumerateArray()
+            .Select(x =>
+            {
+                var timestamp = x[0].GetInt64();
+                return (
+                    Time: DateTimeOffset.FromUnixTimeMilliseconds(timestamp),
+                    Price: x[1].GetDecimal(),
+                    Volume: volumes.GetValueOrDefault(timestamp));
+            })
+            .ToArray();
+
+        var todayUtc = DateTimeOffset.UtcNow.Date;
+        return points.GroupBy(x => x.Time.UtcDateTime.Date)
+            .Where(g => g.Key < todayUtc)
+            .Select(g =>
+            {
+                var ordered = g.OrderBy(x => x.Time).ToArray();
+                return new Candle(
+                    new DateTimeOffset(g.Key, TimeSpan.Zero),
+                    ordered[0].Price,
+                    ordered.Max(x => x.Price),
+                    ordered.Min(x => x.Price),
+                    ordered[^1].Price,
+                    ordered[^1].Volume);
+            })
+            .OrderBy(x => x.Time)
+            .ToArray();
     }
 
     private async Task<HttpResponseMessage> GetWithRateLimitRetryAsync(

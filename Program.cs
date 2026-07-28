@@ -44,6 +44,15 @@ try
                 if (i < coins.Length - 1) await Task.Delay(TimeSpan.FromSeconds(3), cancellation.Token);
             }
             break;
+        case "trx-monitor":
+            RunTrxMonitor(market);
+            break;
+        case "trx-signal":
+            var trxDaily = await market.GetRecentDailyAsync("TRX", 45, "aud", cancellation.Token);
+            var trxSignal = TrxStrategy.Evaluate(trxDaily);
+            Console.WriteLine($"{trxSignal.Action}: {trxSignal.Explanation}");
+            Console.WriteLine($"TRX A${trxSignal.Price:N6} | MA20 A${trxSignal.MovingAverage20:N6} | support A${trxSignal.Support:N3}");
+            break;
         case "quote-buy":
         case "quote-sell":
         case "buy":
@@ -110,9 +119,29 @@ CryptoTrader
   dotnet run -- price BTC
   dotnet run -- history BTC [--years 5] [--currency usd] [--csv]
   dotnet run -- trend [BTC,ETH,XRP,USDT,SOL,USDC] [--currency aud]
+  dotnet run -- trx-monitor
+  dotnet run -- trx-signal
   dotnet run -- quote-buy BTC 100 --amount-type aud
   dotnet run -- buy BTC 100 --amount-type aud --confirm-live
   dotnet run -- quote-sell BTC 0.001 --amount-type coin
   dotnet run -- sell BTC 0.001 --amount-type coin --confirm-live
 """);
+}
+
+static void RunTrxMonitor(MarketDataClient market)
+{
+    Exception? error = null;
+    var thread = new Thread(() =>
+    {
+        try
+        {
+            ApplicationConfiguration.Initialize();
+            Application.Run(new TrxMonitorForm(market));
+        }
+        catch (Exception ex) { error = ex; }
+    });
+    thread.SetApartmentState(ApartmentState.STA);
+    thread.Start();
+    thread.Join();
+    if (error is not null) throw error;
 }
