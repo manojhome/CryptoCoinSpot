@@ -66,6 +66,18 @@ function render(data) {
   $("finalTarget").textContent = aud(data.plan.finalTarget, 6);
   $("maxRisk").textContent = aud(data.plan.maxRiskAud, 2);
 
+  const yesterdayClose = Number(data.daily.at(-1).close);
+  const dailyMove = (Number(data.currentPrice) / yesterdayClose - 1) * 100;
+  const direction = dailyMove > 0 ? "up" : dailyMove < 0 ? "down" : "neutral";
+  const card = $("pullbackCard");
+  card.classList.remove("up", "down", "neutral");
+  card.classList.add(direction);
+  $("dailyDirection").textContent = direction === "up"
+    ? `↑ ${dailyMove.toFixed(2)}% vs yesterday`
+    : direction === "down"
+      ? `↓ ${Math.abs(dailyMove).toFixed(2)}% vs yesterday`
+      : "Unchanged vs yesterday";
+
   $("dailyRows").innerHTML = data.daily.slice(-7).reverse().map(x => `<tr>
     <td>${new Date(x.time).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</td>
     <td>${number(x.open, 5)}</td><td>${number(x.high, 5)}</td><td>${number(x.low, 5)}</td><td>${number(x.close, 5)}</td>

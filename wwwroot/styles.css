@@ -63,6 +63,14 @@ button span { margin-left: 18px; }
 canvas { width: 100%; height: 245px; margin-top: 14px; display: block; }
 .lower-grid { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 14px; margin-top: 14px; }
 .rule-card, .plan-card, .daily-card { padding: 22px; min-width: 0; }
+.daily-card { border-width: 2px; transition: border-color .2s ease, background-color .2s ease; }
+.daily-card.up { border-color: rgba(18,166,106,.65); background: linear-gradient(145deg, rgba(18,166,106,.10), #fff 45%); }
+.daily-card.down { border-color: rgba(216,77,77,.68); background: linear-gradient(145deg, rgba(216,77,77,.10), #fff 45%); }
+.daily-card.neutral { border-color: var(--line); }
+.daily-card.up h2, .daily-card.up .direction-badge { color: var(--green-dark); }
+.daily-card.down h2, .daily-card.down .direction-badge { color: var(--red); }
+.pullback-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.direction-badge { padding: 6px 9px; border: 1px solid currentColor; border-radius: 999px; color: var(--muted); font: 700 11px/1 ui-monospace, Consolas, monospace; white-space: nowrap; }
 ul { list-style: none; padding: 0; margin: 18px 0 0; }
 li { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
 li::before { content: "○"; color: var(--red); font-weight: 900; }
@@ -89,4 +97,5 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .control-panel, .metrics { grid-template-columns: 1fr; }
   .signal-strip { grid-template-columns: 1fr; }
   h1 { font-size: 45px; }
+  .pullback-heading { align-items: flex-start; flex-direction: column; }
 }
