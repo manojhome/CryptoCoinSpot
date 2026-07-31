@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Crypto trend-and-pullback paper investment dashboard">
+  <title>CryptoCoinSpot Market Monitor</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">CRYPTOCOINSPOT / PAPER MONITOR</p>
+        <h1>Wait for the pullback.<br><span>Act on confirmation.</span></h1>
+        <p class="intro">An hourly market dashboard for testing the trend-and-pullback pattern without placing a trade.</p>
+      </div>
+      <div class="refresh-box">
+        <span class="live-dot"></span>
+        <div><strong id="refreshState">Ready</strong><small id="countdown">Updates hourly</small></div>
+      </div>
+    </header>
+
+    <section class="control-panel" aria-label="Investment settings">
+      <label>Coin ticker
+        <input id="coin" value="TRX" maxlength="10" autocomplete="off" spellcheck="false">
+      </label>
+      <label>Paper investment (AUD)
+        <div class="money-input"><span>A$</span><input id="amount" type="number" value="1000" min="0.01" step="10"></div>
+      </label>
+      <button id="analyse">Analyse investment <span>→</span></button>
+      <p class="hint">Try BTC, ETH, XRP, TRX, USDT, SOL or USDC. No real order is placed.</p>
+    </section>
+
+    <div id="error" class="error" role="alert" hidden></div>
+
+    <section id="dashboard" hidden>
+      <div class="signal-strip">
+        <div>
+          <p class="label">Strategy signal</p>
+          <p id="signal" class="signal">—</p>
+        </div>
+        <p id="explanation" class="explanation">—</p>
+      </div>
+
+      <div class="metrics">
+        <article><p>Current price</p><strong id="currentPrice">—</strong><small>AUD</small></article>
+        <article><p>Paper units</p><strong id="units">—</strong><small id="unitCoin">coins</small></article>
+        <article><p>Current value</p><strong id="currentValue">—</strong><small id="valueChange">entry snapshot</small></article>
+        <article><p>Hourly trend</p><strong id="trend">—</strong><small id="trendMeta">—</small></article>
+      </div>
+
+      <div class="charts">
+        <article class="chart-card">
+          <div class="card-head"><div><p class="label">MARKET</p><h2>96-hour price</h2></div><span id="priceRange">—</span></div>
+          <canvas id="priceChart" aria-label="Hourly coin price chart"></canvas>
+        </article>
+        <article class="chart-card">
+          <div class="card-head"><div><p class="label">POSITION</p><h2>Paper investment value</h2></div><span id="valueRange">—</span></div>
+          <canvas id="valueChart" aria-label="Hourly paper investment value chart"></canvas>
+        </article>
+      </div>
+
+      <div class="lower-grid">
+        <article class="rule-card">
+          <p class="label">ENTRY CHECKLIST</p>
+          <h2>Five gates to a setup</h2>
+          <ul id="rules"></ul>
+        </article>
+        <article class="plan-card">
+          <p class="label">RISK PLAN</p>
+          <h2>Mechanical exits</h2>
+          <dl>
+            <div><dt>Protective stop</dt><dd id="stop">—</dd></div>
+            <div><dt>Take 50%</dt><dd id="firstTarget">—</dd></div>
+            <div><dt>Final target</dt><dd id="finalTarget">—</dd></div>
+            <div><dt>1% capital risk</dt><dd id="maxRisk">—</dd></div>
+          </dl>
+        </article>
+        <article class="daily-card">
+          <p class="label">LATEST DAILY CANDLES</p>
+          <h2>Pullback context</h2>
+          <div class="table-wrap">
+            <table><thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th></tr></thead><tbody id="dailyRows"></tbody></table>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer>This is a descriptive paper-trading tool, not financial advice. Market feeds can differ from executable CoinSpot prices.</footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

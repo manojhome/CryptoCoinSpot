@@ -1,7 +1,7 @@
-# CryptoTrader
+# CryptoCoinSpot ASP.NET Dashboard
 
-A .NET 8 command-line app for CoinSpot instant buy/sell operations, historical
-daily statistics, and hourly trend screening.
+A .NET 8 ASP.NET Core dashboard for paper-investment tracking, CoinSpot market
+data, historical statistics, and hourly trend screening.
 
 ## Security first
 
@@ -19,23 +19,17 @@ $env:COINSPOT_API_SECRET = "your-new-secret"
 CoinSpot requires both values. The key identifies the account; the secret signs
 the exact JSON request body with HMAC-SHA512.
 
-## Run
+## Run the web app
 
 ```powershell
 dotnet build
-dotnet run -- price BTC
-dotnet run -- history BTC --years 5 --currency usd --csv
-dotnet run -- trend
-dotnet run -- trx-monitor
-dotnet run -- trx-signal
+dotnet run
 ```
 
-`trx-monitor` opens an input box for an AUD paper-investment amount, snapshots
-the entry price, and displays its estimated TRX value. It refreshes hourly and
-evaluates the 20-day moving-average, 2–3 red-day pullback, AUD support zones,
-green breakout, volume confirmation, stop, partial-profit, and final-exit
-rules. It does not place trades or use CoinSpot credentials.
-`trx-signal` prints the same current strategy assessment without opening the UI.
+Open the local URL shown by ASP.NET. Enter a coin ticker (TRX by default) and
+an AUD paper-investment amount. The responsive dashboard refreshes hourly and
+shows price and investment-value charts, trend metrics, the five entry gates,
+daily candles, stop level, and profit targets. It never places a trade.
 
 Review an instant quote before placing a live order:
 

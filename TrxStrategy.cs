@@ -4,7 +4,7 @@ public static class TrxStrategy
 {
     private static readonly decimal[] Supports = [0.440m, 0.460m, 0.465m, 0.475m, 0.480m];
 
-    public static TrxSignal Evaluate(IReadOnlyList<Candle> daily)
+    public static TrxSignal Evaluate(string coin, IReadOnlyList<Candle> daily)
     {
         if (daily.Count < 24)
             throw new InvalidOperationException("At least 24 completed daily candles are required.");
@@ -28,7 +28,9 @@ public static class TrxStrategy
         var pullbackLow = candles.Skip(Math.Max(0, candles.Length - redDays - 1))
             .Take(Math.Max(1, redDays))
             .Min(x => x.Low);
-        var support = Supports.Where(x => x <= pullbackLow).DefaultIfEmpty(0).Max();
+        var support = coin.Equals("TRX", StringComparison.OrdinalIgnoreCase)
+            ? Supports.Where(x => x <= pullbackLow).DefaultIfEmpty(0).Max()
+            : candles[^10..].Min(x => x.Low);
         var heldSupport = support > 0 && pullbackLow >= support;
         var buy = aboveMa && redDays is 2 or 3 && heldSupport && greenBreakout && aboveVolume;
 
