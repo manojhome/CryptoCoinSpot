@@ -6,6 +6,8 @@ let priceHover = null;
 let pullbackHover = null;
 let pullbackMarkers = null;
 let pullbackCandles = [];
+let strategySimulations = null;
+let selectedStrategy = "threeRed";
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
@@ -19,6 +21,21 @@ $("amount").addEventListener("keydown", e => { if (e.key === "Enter") analyse();
 $("pullbackPeriod").addEventListener("change", () => {
   pullbackHover = null;
   if (snapshot) drawPullbackAnalysis(snapshot.daily);
+});
+const strategySelectors = {
+  threeRed: { id: "strategySummary", buyDays: 3, sellDays: 3 },
+  twoRed: { id: "strategyTwoRedSummary", buyDays: 3, sellDays: 2 },
+  twoGreen: { id: "strategyTwoGreenSummary", buyDays: 2, sellDays: 3 }
+};
+Object.entries(strategySelectors).forEach(([key, config]) => {
+  const element = $(config.id);
+  const select = () => selectStrategy(key);
+  element.addEventListener("click", select);
+  element.addEventListener("keydown", event => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    select();
+  });
 });
 $("priceChart").addEventListener("mousemove", event => {
   if (!snapshot?.hourly?.length) return;
@@ -97,6 +114,7 @@ function clearMarketSections() {
   snapshot = null;
   pullbackMarkers = null;
   pullbackCandles = [];
+  strategySimulations = null;
   for (const id of ["priceChart", "valueChart", "pullbackChart"]) {
     const canvas = $(id);
     const ctx = canvas.getContext("2d");
@@ -218,17 +236,30 @@ function drawPullbackAnalysis(allCandles) {
   const dailyHighs = pullbackCandles.map(x => Number(x.high));
   $("pullbackChartRange").textContent = `${pullbackCandles.length} days · ${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
   renderStreakMetrics(pullbackCandles);
-  const simulations = renderStrategySimulation(pullbackCandles);
-  pullbackMarkers = {
-    buys: simulations.threeRed.buyIndexes,
-    buysTwoGreen: simulations.twoGreen.buyIndexes,
-    sellsTwoRed: simulations.twoRed.sellIndexes,
-    sellsThreeRed: [...new Set([
-      ...simulations.threeRed.sellIndexes,
-      ...simulations.twoGreen.sellIndexes
-    ])]
-  };
+  strategySimulations = renderStrategySimulation(pullbackCandles);
+  updateSelectedStrategyMarkers();
   drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover, pullbackMarkers);
+}
+
+function selectStrategy(key) {
+  selectedStrategy = key;
+  updateSelectedStrategyMarkers();
+  if (pullbackCandles.length)
+    drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover, pullbackMarkers);
+}
+
+function updateSelectedStrategyMarkers() {
+  Object.entries(strategySelectors).forEach(([key, config]) => {
+    const selected = key === selectedStrategy;
+    $(config.id).classList.toggle("selected", selected);
+    $(config.id).setAttribute("aria-pressed", String(selected));
+  });
+  const config = strategySelectors[selectedStrategy];
+  $("selectedBuyLegend").textContent = `Selected: buy after ${config.buyDays} green`;
+  $("selectedSellLegend").textContent = `Sell after ${config.sellDays} red`;
+  if (!strategySimulations) return;
+  const result = strategySimulations[selectedStrategy];
+  pullbackMarkers = { buys: result.buyIndexes, sells: result.sellIndexes };
 }
 
 function renderStreakMetrics(candles) {
@@ -515,10 +546,8 @@ function drawPriceCandles(canvas, candles, hover = null, markers = null) {
       });
       ctx.restore();
     };
-    drawMarkerLines(markers.buys, "rgba(8,115,74,.55)");
-    drawMarkerLines(markers.buysTwoGreen, "rgba(18,166,106,.72)", [5, 4]);
-    drawMarkerLines(markers.sellsTwoRed, "rgba(216,77,77,.50)");
-    drawMarkerLines(markers.sellsThreeRed, "rgba(148,35,35,.72)", [5, 4]);
+    drawMarkerLines(markers.buys, "rgba(8,115,74,.62)");
+    drawMarkerLines(markers.sells, "rgba(216,77,77,.62)");
   }
 
   candles.forEach((candle, index) => {
