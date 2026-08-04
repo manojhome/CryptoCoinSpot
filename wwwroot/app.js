@@ -254,11 +254,16 @@ function render(data) {
     const sourceIndex = firstVisibleIndex + visibleIndex;
     const previousClose = sourceIndex > 0 ? Number(data.daily[sourceIndex - 1].close) : Number(x.close);
     const close = Number(x.close);
+    const high = Number(x.high);
+    const low = Number(x.low);
+    const dailyRange = high - low;
+    const dailyRangePercent = low ? dailyRange / low * 100 : 0;
     const changePercent = previousClose ? (close / previousClose - 1) * 100 : 0;
     const rowDirection = close > previousClose ? "day-up" : close < previousClose ? "day-down" : "day-flat";
     return `<tr class="${rowDirection}">
       <td>${new Date(x.time).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</td>
-      <td>${number(x.open, 5)}</td><td>${number(x.high, 5)}</td><td>${number(x.low, 5)}</td><td>${number(x.close, 5)}</td>
+      <td>${number(x.open, 5)}</td><td>${number(high, 5)}</td><td>${number(low, 5)}</td>
+      <td class="range-cell">${number(dailyRange, 5)} <small>(${dailyRangePercent.toFixed(2)}%)</small></td><td>${number(close, 5)}</td>
       <td class="change-cell">${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%</td>
     </tr>`;
   }).reverse().join("");

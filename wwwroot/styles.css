@@ -137,6 +137,8 @@ tbody tr.day-up { color: var(--green-dark); background: rgba(18,166,106,.075); }
 tbody tr.day-down { color: var(--red); background: rgba(216,77,77,.075); }
 tbody tr.day-flat { color: var(--muted); }
 .change-cell { font-weight: 900; }
+.range-cell { font-weight: 800; white-space: nowrap; }
+.range-cell small { color: var(--amber); font-size: 9px; }
 tr.day-up .change-cell { color: var(--green-dark); }
 tr.day-down .change-cell { color: var(--red); }
 tr.day-flat .change-cell { color: var(--muted); }
