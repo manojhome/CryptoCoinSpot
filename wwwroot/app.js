@@ -150,6 +150,7 @@ function clearMarketSections() {
   }
   $("priceRange").textContent = "Unavailable";
   $("dailyPercentRange").textContent = "Unavailable";
+  $("dailyRangeAverage").textContent = "Avg —";
   $("dailyTrend").textContent = "—";
   $("dailyTrend").className = "trend-neutral";
   $("dailyTrendMeta").textContent = "Unavailable";
@@ -304,6 +305,14 @@ function drawPullbackAnalysis(allCandles) {
   if (!pullbackCandles.length) return;
   const dailyLows = pullbackCandles.map(x => Number(x.low));
   const dailyHighs = pullbackCandles.map(x => Number(x.high));
+  const dailyRanges = pullbackCandles.map(x => {
+    const low = Number(x.low);
+    const difference = Number(x.high) - low;
+    return { difference, percentage: low ? difference / low * 100 : 0 };
+  });
+  const averageRange = dailyRanges.reduce((total, value) => total + value.difference, 0) / dailyRanges.length;
+  const averageRangePercent = dailyRanges.reduce((total, value) => total + value.percentage, 0) / dailyRanges.length;
+  $("dailyRangeAverage").textContent = `Avg ${number(averageRange, 5)} (${averageRangePercent.toFixed(2)}%)`;
   $("pullbackChartRange").textContent = `${pullbackCandles.length} days · ${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
   renderStreakMetrics(pullbackCandles);
   const investmentAmount = Number(snapshot?.amount) || 1000;

@@ -133,6 +133,7 @@ table { width: 100%; margin-top: 15px; border-collapse: collapse; font-size: 12p
 th, td { padding: 10px 8px; text-align: right; border-bottom: 1px solid var(--line); font-family: ui-monospace, Consolas, monospace; }
 th:first-child, td:first-child { text-align: left; }
 th { position: sticky; top: 0; z-index: 1; color: var(--muted); background: var(--card); font-size: 10px; letter-spacing: .06em; }
+th #dailyRangeAverage { display: block; margin-top: 3px; color: var(--amber); font-size: 8px; letter-spacing: 0; white-space: nowrap; }
 tbody tr.day-up { color: var(--green-dark); background: rgba(18,166,106,.075); }
 tbody tr.day-down { color: var(--red); background: rgba(216,77,77,.075); }
 tbody tr.day-flat { color: var(--muted); }
