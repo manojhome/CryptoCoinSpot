@@ -101,9 +101,15 @@ function clearMarketSections() {
   for (const id of ["greenTripleRuns", "redTripleRuns", "averageGreenRun", "averageRedRun"])
     $(id).textContent = "—";
   $("strategySummary").className = "strategy-summary neutral";
+  $("strategyTwoRedSummary").className = "strategy-summary neutral";
   $("strategyEndingValue").textContent = "—";
+  $("strategyTwoRedEndingValue").textContent = "—";
   $("strategyPnl").textContent = "Market data unavailable";
-  for (const id of ["strategyEntries", "strategyExits", "strategyPosition"])
+  $("strategyTwoRedPnl").textContent = "Market data unavailable";
+  for (const id of [
+    "strategyEntries", "strategyExits", "strategyPosition",
+    "strategyTwoRedEntries", "strategyTwoRedExits", "strategyTwoRedPosition"
+  ])
     $(id).textContent = "—";
   $("signal").textContent = "—";
   $("explanation").textContent = "Market data is temporarily unavailable. Wallet and gainers can still refresh independently.";
@@ -229,6 +235,25 @@ function renderStreakMetrics(candles) {
 }
 
 function renderStrategySimulation(candles) {
+  renderStrategyResult(simulateStrategy(candles, 3), {
+    summary: "strategySummary",
+    endingValue: "strategyEndingValue",
+    pnl: "strategyPnl",
+    entries: "strategyEntries",
+    exits: "strategyExits",
+    position: "strategyPosition"
+  });
+  renderStrategyResult(simulateStrategy(candles, 2), {
+    summary: "strategyTwoRedSummary",
+    endingValue: "strategyTwoRedEndingValue",
+    pnl: "strategyTwoRedPnl",
+    entries: "strategyTwoRedEntries",
+    exits: "strategyTwoRedExits",
+    position: "strategyTwoRedPosition"
+  });
+}
+
+function simulateStrategy(candles, sellAfterRedDays) {
   const startingCapital = 1000;
   let cash = startingCapital;
   let units = 0;
@@ -254,7 +279,7 @@ function renderStrategySimulation(candles) {
       units = cash / close;
       cash = 0;
       entries++;
-    } else if (units && redDays === 3) {
+    } else if (units && redDays === sellAfterRedDays) {
       cash = units * close;
       units = 0;
       exits++;
@@ -265,13 +290,17 @@ function renderStrategySimulation(candles) {
   const endingValue = units ? units * latestClose : cash;
   const profit = endingValue - startingCapital;
   const profitPercent = profit / startingCapital * 100;
-  const summary = $("strategySummary");
-  summary.className = `strategy-summary ${profit > 0 ? "profit" : profit < 0 ? "loss" : "neutral"}`;
-  $("strategyEndingValue").textContent = aud(endingValue, 2);
-  $("strategyPnl").textContent = `${profit >= 0 ? "+" : "−"}${aud(Math.abs(profit), 2)} (${profit >= 0 ? "+" : ""}${profitPercent.toFixed(2)}%)`;
-  $("strategyEntries").textContent = entries;
-  $("strategyExits").textContent = exits;
-  $("strategyPosition").textContent = units ? "Invested" : "Cash";
+  return { endingValue, profit, profitPercent, entries, exits, invested: Boolean(units) };
+}
+
+function renderStrategyResult(result, ids) {
+  const summary = $(ids.summary);
+  summary.className = `strategy-summary ${result.profit > 0 ? "profit" : result.profit < 0 ? "loss" : "neutral"}`;
+  $(ids.endingValue).textContent = aud(result.endingValue, 2);
+  $(ids.pnl).textContent = `${result.profit >= 0 ? "+" : "−"}${aud(Math.abs(result.profit), 2)} (${result.profit >= 0 ? "+" : ""}${result.profitPercent.toFixed(2)}%)`;
+  $(ids.entries).textContent = result.entries;
+  $(ids.exits).textContent = result.exits;
+  $(ids.position).textContent = result.invested ? "Invested" : "Cash";
 }
 
 async function loadGainers() {
