@@ -108,7 +108,8 @@ function clearMarketSections() {
   $("strategyTwoRedPnl").textContent = "Market data unavailable";
   for (const id of [
     "strategyEntries", "strategyExits", "strategyPosition",
-    "strategyTwoRedEntries", "strategyTwoRedExits", "strategyTwoRedPosition"
+    "strategyContributed", "strategyTwoRedEntries", "strategyTwoRedExits",
+    "strategyTwoRedPosition", "strategyTwoRedContributed"
   ])
     $(id).textContent = "—";
   $("signal").textContent = "—";
@@ -240,6 +241,7 @@ function renderStrategySimulation(candles) {
     endingValue: "strategyEndingValue",
     pnl: "strategyPnl",
     entries: "strategyEntries",
+    contributed: "strategyContributed",
     exits: "strategyExits",
     position: "strategyPosition"
   });
@@ -248,15 +250,17 @@ function renderStrategySimulation(candles) {
     endingValue: "strategyTwoRedEndingValue",
     pnl: "strategyTwoRedPnl",
     entries: "strategyTwoRedEntries",
+    contributed: "strategyTwoRedContributed",
     exits: "strategyTwoRedExits",
     position: "strategyTwoRedPosition"
   });
 }
 
 function simulateStrategy(candles, sellAfterRedDays) {
-  const startingCapital = 1000;
-  let cash = startingCapital;
+  const contributionPerSignal = 1000;
+  let cash = 0;
   let units = 0;
+  let totalContributed = 0;
   let greenDays = 0;
   let redDays = 0;
   let entries = 0;
@@ -275,22 +279,22 @@ function simulateStrategy(candles, sellAfterRedDays) {
       redDays = 0;
     }
 
-    if (!units && greenDays === 3) {
-      units = cash / close;
-      cash = 0;
+    if (greenDays === 3) {
+      totalContributed += contributionPerSignal;
+      units += contributionPerSignal / close;
       entries++;
     } else if (units && redDays === sellAfterRedDays) {
-      cash = units * close;
+      cash += units * close;
       units = 0;
       exits++;
     }
   });
 
   const latestClose = Number(candles.at(-1).close);
-  const endingValue = units ? units * latestClose : cash;
-  const profit = endingValue - startingCapital;
-  const profitPercent = profit / startingCapital * 100;
-  return { endingValue, profit, profitPercent, entries, exits, invested: Boolean(units) };
+  const endingValue = cash + units * latestClose;
+  const profit = endingValue - totalContributed;
+  const profitPercent = totalContributed ? profit / totalContributed * 100 : 0;
+  return { endingValue, profit, profitPercent, entries, exits, totalContributed, invested: Boolean(units) };
 }
 
 function renderStrategyResult(result, ids) {
@@ -299,6 +303,7 @@ function renderStrategyResult(result, ids) {
   $(ids.endingValue).textContent = aud(result.endingValue, 2);
   $(ids.pnl).textContent = `${result.profit >= 0 ? "+" : "−"}${aud(Math.abs(result.profit), 2)} (${result.profit >= 0 ? "+" : ""}${result.profitPercent.toFixed(2)}%)`;
   $(ids.entries).textContent = result.entries;
+  $(ids.contributed).textContent = aud(result.totalContributed, 0);
   $(ids.exits).textContent = result.exits;
   $(ids.position).textContent = result.invested ? "Invested" : "Cash";
 }
