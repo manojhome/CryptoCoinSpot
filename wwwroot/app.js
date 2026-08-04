@@ -98,6 +98,12 @@ function render(data) {
   $("currentValue").textContent = aud(currentValue, 2);
   $("valueChange").textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}% from snapshot`;
   $("trend").textContent = data.trend.trend;
+  const trendDirection = data.trend.trend.toUpperCase();
+  $("trend").className = trendDirection.includes("UP")
+    ? "trend-up"
+    : trendDirection.includes("DOWN")
+      ? "trend-down"
+      : "trend-neutral";
   $("trendMeta").textContent = `24h ${data.trend.change24HoursPercent >= 0 ? "+" : ""}${Number(data.trend.change24HoursPercent).toFixed(2)}% · RSI ${Number(data.trend.rsi14).toFixed(1)}`;
 
   const checks = [

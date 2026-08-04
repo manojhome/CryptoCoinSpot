@@ -54,6 +54,9 @@ button span { margin-left: 18px; }
 .metrics article { padding: 20px; }
 .metrics p { margin: 0 0 14px; color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
 .metrics strong { display: block; font-size: clamp(21px, 2.5vw, 34px); line-height: 1; letter-spacing: -.04em; }
+.metrics strong.trend-up { color: var(--green-dark); }
+.metrics strong.trend-down { color: var(--red); }
+.metrics strong.trend-neutral { color: var(--ink); }
 .metrics small { display: block; margin-top: 8px; color: var(--muted); }
 .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .chart-card { min-width: 0; padding: 20px; }
