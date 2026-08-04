@@ -32,7 +32,7 @@ app.MapGet("/api/dashboard", async (
     {
         coin = CoinSpotClient.NormalizeCoin(coin);
         if (amount <= 0 || amount > 100_000_000)
-            return Results.BadRequest(new { error = "Investment amount must be between A$0.01 and A$100,000,000." });
+            return Results.BadRequest(new { error = "Investment amount must be between $0.01 and $100,000,000." });
 
         var hourly = await market.GetHourlyAsync(coin, 4, "aud", cancellationToken);
         IReadOnlyList<Candle> storedDaily;

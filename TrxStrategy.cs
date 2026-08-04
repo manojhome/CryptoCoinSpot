@@ -35,9 +35,9 @@ public static class TrxStrategy
         var buy = aboveMa && redDays is 2 or 3 && heldSupport && greenBreakout && aboveVolume;
 
         var explanation = buy
-            ? $"All conditions met: above MA20, {redDays} red-day pullback held A${support:N3}, green breakout, and confirming volume."
+            ? $"All conditions met: above MA20, {redDays} red-day pullback held ${support:N3}, green breakout, and confirming volume."
             : $"Waiting: MA20={(aboveMa ? "yes" : "no")}, red pullback={redDays} (need 2–3), " +
-              $"support={(heldSupport ? $"held A${support:N3}" : "not confirmed")}, " +
+              $"support={(heldSupport ? $"held ${support:N3}" : "not confirmed")}, " +
               $"green breakout={(greenBreakout ? "yes" : "no")}, volume={(aboveVolume ? "above" : "below")} average.";
 
         return new TrxSignal(
@@ -49,7 +49,7 @@ public static class TrxStrategy
         decimal entryPrice, decimal currentPrice, decimal support, IReadOnlyList<Candle> daily)
     {
         var stop = support > 0 ? Math.Max(entryPrice * 0.96m, support) : entryPrice * 0.96m;
-        if (currentPrice <= stop) return $"EXIT ALL — stop A${stop:N4} reached";
+        if (currentPrice <= stop) return $"EXIT ALL — stop ${stop:N4} reached";
         if (currentPrice >= entryPrice * 1.10m) return "FINAL TARGET — consider exiting remaining balance";
         if (currentPrice >= entryPrice * 1.07m) return "FIRST TARGET — consider taking 50% profit";
 
@@ -60,6 +60,6 @@ public static class TrxStrategy
         var ma10 = ordered[^10..].Average(x => x.Close);
         if (twoRed || ordered[^1].Close < ma10)
             return "EXIT SIGNAL — two red days or close below MA10";
-        return $"HOLD — stop A${stop:N4}, first target A${entryPrice * 1.07m:N4}";
+        return $"HOLD — stop ${stop:N4}, first target ${entryPrice * 1.07m:N4}";
     }
 }

@@ -12,7 +12,7 @@ let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
 
-const aud = (n, digits = 4) => `A$${Number(n).toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+const aud = (n, digits = 4) => `$${Number(n).toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFractionDigits: digits });
 
 $("analyse").addEventListener("click", analyse);
