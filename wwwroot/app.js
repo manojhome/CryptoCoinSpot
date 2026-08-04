@@ -25,7 +25,8 @@ $("pullbackPeriod").addEventListener("change", () => {
 const strategySelectors = {
   threeRed: { id: "strategySummary", buyDays: 3, sellDays: 3 },
   twoRed: { id: "strategyTwoRedSummary", buyDays: 3, sellDays: 2 },
-  twoGreen: { id: "strategyTwoGreenSummary", buyDays: 2, sellDays: 3 }
+  twoGreen: { id: "strategyTwoGreenSummary", buyDays: 2, sellDays: 3 },
+  twoGreenTwoRed: { id: "strategyTwoGreenTwoRedSummary", buyDays: 2, sellDays: 2 }
 };
 Object.entries(strategySelectors).forEach(([key, config]) => {
   const element = $(config.id);
@@ -129,18 +130,23 @@ function clearMarketSections() {
   $("strategySummary").className = "strategy-summary neutral";
   $("strategyTwoRedSummary").className = "strategy-summary neutral";
   $("strategyTwoGreenSummary").className = "strategy-summary neutral";
+  $("strategyTwoGreenTwoRedSummary").className = "strategy-summary neutral";
   $("strategyEndingValue").textContent = "—";
   $("strategyTwoRedEndingValue").textContent = "—";
   $("strategyTwoGreenEndingValue").textContent = "—";
+  $("strategyTwoGreenTwoRedEndingValue").textContent = "—";
   $("strategyPnl").textContent = "Market data unavailable";
   $("strategyTwoRedPnl").textContent = "Market data unavailable";
   $("strategyTwoGreenPnl").textContent = "Market data unavailable";
+  $("strategyTwoGreenTwoRedPnl").textContent = "Market data unavailable";
   for (const id of [
     "strategyEntries", "strategyExits", "strategyPosition",
     "strategyContributed", "strategyTwoRedEntries", "strategyTwoRedExits",
     "strategyTwoRedPosition", "strategyTwoRedContributed",
     "strategyTwoGreenEntries", "strategyTwoGreenExits", "strategyTwoGreenPosition",
-    "strategyTwoGreenContributed"
+    "strategyTwoGreenContributed", "strategyTwoGreenTwoRedEntries",
+    "strategyTwoGreenTwoRedExits", "strategyTwoGreenTwoRedPosition",
+    "strategyTwoGreenTwoRedContributed"
   ])
     $(id).textContent = "—";
   $("signal").textContent = "—";
@@ -299,6 +305,7 @@ function renderStrategySimulation(candles) {
   const threeRed = simulateStrategy(candles, 3, 3);
   const twoRed = simulateStrategy(candles, 3, 2);
   const twoGreen = simulateStrategy(candles, 2, 3);
+  const twoGreenTwoRed = simulateStrategy(candles, 2, 2);
   renderStrategyResult(threeRed, {
     summary: "strategySummary",
     endingValue: "strategyEndingValue",
@@ -326,7 +333,16 @@ function renderStrategySimulation(candles) {
     exits: "strategyTwoGreenExits",
     position: "strategyTwoGreenPosition"
   });
-  return { threeRed, twoRed, twoGreen };
+  renderStrategyResult(twoGreenTwoRed, {
+    summary: "strategyTwoGreenTwoRedSummary",
+    endingValue: "strategyTwoGreenTwoRedEndingValue",
+    pnl: "strategyTwoGreenTwoRedPnl",
+    entries: "strategyTwoGreenTwoRedEntries",
+    contributed: "strategyTwoGreenTwoRedContributed",
+    exits: "strategyTwoGreenTwoRedExits",
+    position: "strategyTwoGreenTwoRedPosition"
+  });
+  return { threeRed, twoRed, twoGreen, twoGreenTwoRed };
 }
 
 function simulateStrategy(candles, buyAfterGreenDays, sellAfterRedDays) {
