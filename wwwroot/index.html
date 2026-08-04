@@ -131,7 +131,7 @@
           <div class="streak-red"><span>Average red run</span><strong id="averageRedRun">—</strong><small>consecutive days</small></div>
         </div>
         <div class="strategy-summaries">
-          <div id="strategySummary" class="strategy-summary neutral selected" role="button" tabindex="0" aria-pressed="true">
+          <div id="strategySummary" class="strategy-summary neutral" role="button" tabindex="0" aria-pressed="false">
             <div>
               <span id="strategyThreeRedTitle">Paper amount per signal — 3 consecutive green / 3 consecutive red</span>
               <strong id="strategyEndingValue">—</strong>
@@ -210,8 +210,8 @@
         </div>
         <p id="simulationNote" class="simulation-note">Each qualifying buy contributes the paper investment amount. Each qualifying sell converts the same amount only—not the full accumulated holding. Profit/loss is measured against total contributions. Fees, spreads, slippage and tax are excluded.</p>
         <div class="signal-legend" aria-label="Pullback chart signal line legend">
-          <span id="selectedBuyLegend" class="legend-buy">Selected: buy after 3 green</span>
-          <span id="selectedSellLegend" class="legend-sell">Sell after 3 red</span>
+          <span id="selectedBuyLegend" class="legend-buy">Select a strategy container to show signals</span>
+          <span id="selectedSellLegend" class="legend-sell">Buy and sell lines are hidden by default</span>
         </div>
         <canvas id="pullbackChart" aria-label="Interactive 365-day pullback context OHLC candlestick chart"></canvas>
       </article>

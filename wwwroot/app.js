@@ -9,7 +9,7 @@ let pullbackHover = null;
 let pullbackMarkers = null;
 let pullbackCandles = [];
 let strategySimulations = null;
-let selectedStrategy = "threeRed";
+let selectedStrategy = null;
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
@@ -345,6 +345,12 @@ function updateSelectedStrategyMarkers() {
     $(config.id).classList.toggle("selected", selected);
     $(config.id).setAttribute("aria-pressed", String(selected));
   });
+  if (!selectedStrategy) {
+    pullbackMarkers = null;
+    $("selectedBuyLegend").textContent = "Select a strategy container to show signals";
+    $("selectedSellLegend").textContent = "Buy and sell lines are hidden by default";
+    return;
+  }
   const config = strategySelectors[selectedStrategy];
   if (!strategySimulations) return;
   const result = strategySimulations[selectedStrategy];
