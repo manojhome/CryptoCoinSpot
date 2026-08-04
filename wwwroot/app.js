@@ -5,6 +5,7 @@ let walletSnapshot = null;
 let priceHover = null;
 let pullbackHover = null;
 let pullbackMarkers = null;
+let pullbackCandles = [];
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
@@ -15,6 +16,10 @@ const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFra
 $("analyse").addEventListener("click", analyse);
 $("coin").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
 $("amount").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
+$("pullbackPeriod").addEventListener("change", () => {
+  pullbackHover = null;
+  if (snapshot) drawPullbackAnalysis(snapshot.daily);
+});
 $("priceChart").addEventListener("mousemove", event => {
   if (!snapshot?.hourly?.length) return;
   const canvas = $("priceChart");
@@ -36,22 +41,22 @@ $("priceChart").addEventListener("mouseleave", () => {
   if (snapshot) drawPriceCandles($("priceChart"), snapshot.hourly);
 });
 $("pullbackChart").addEventListener("mousemove", event => {
-  if (!snapshot?.daily?.length) return;
+  if (!pullbackCandles.length) return;
   const canvas = $("pullbackChart");
   const rect = canvas.getBoundingClientRect();
   const x = (event.clientX - rect.left) * canvas.clientWidth / rect.width;
   const y = (event.clientY - rect.top) * canvas.clientHeight / rect.height;
   const left = 82, right = 12, top = 14, bottom = 34;
-  const step = (canvas.clientWidth - left - right) / snapshot.daily.length;
+  const step = (canvas.clientWidth - left - right) / pullbackCandles.length;
   const index = Math.floor((x - left) / step);
-  pullbackHover = index < 0 || index >= snapshot.daily.length || y < top || y > canvas.clientHeight - bottom
+  pullbackHover = index < 0 || index >= pullbackCandles.length || y < top || y > canvas.clientHeight - bottom
     ? null
     : { index, y };
-  drawPriceCandles(canvas, snapshot.daily, pullbackHover, pullbackMarkers);
+  drawPriceCandles(canvas, pullbackCandles, pullbackHover, pullbackMarkers);
 });
 $("pullbackChart").addEventListener("mouseleave", () => {
   pullbackHover = null;
-  if (snapshot) drawPriceCandles($("pullbackChart"), snapshot.daily, null, pullbackMarkers);
+  if (pullbackCandles.length) drawPriceCandles($("pullbackChart"), pullbackCandles, null, pullbackMarkers);
 });
 window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
@@ -91,6 +96,7 @@ async function analyse(isAutomatic = false) {
 function clearMarketSections() {
   snapshot = null;
   pullbackMarkers = null;
+  pullbackCandles = [];
   for (const id of ["priceChart", "valueChart", "pullbackChart"]) {
     const canvas = $(id);
     const ctx = canvas.getContext("2d");
@@ -196,17 +202,24 @@ function drawCharts(data) {
   drawLine($("valueChart"), values, "#10201b", "rgba(200,240,108,.26)");
   $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
   $("valueRange").textContent = `${aud(Math.min(...values), 2)} — ${aud(Math.max(...values), 2)}`;
-  const dailyLows = data.daily.map(x => Number(x.low));
-  const dailyHighs = data.daily.map(x => Number(x.high));
-  $("pullbackChartRange").textContent = `${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
-  renderStreakMetrics(data.daily);
-  const simulations = renderStrategySimulation(data.daily);
+  drawPullbackAnalysis(data.daily);
+}
+
+function drawPullbackAnalysis(allCandles) {
+  const requestedDays = Number($("pullbackPeriod").value) || 365;
+  pullbackCandles = allCandles.slice(-requestedDays);
+  if (!pullbackCandles.length) return;
+  const dailyLows = pullbackCandles.map(x => Number(x.low));
+  const dailyHighs = pullbackCandles.map(x => Number(x.high));
+  $("pullbackChartRange").textContent = `${pullbackCandles.length} days · ${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
+  renderStreakMetrics(pullbackCandles);
+  const simulations = renderStrategySimulation(pullbackCandles);
   pullbackMarkers = {
     buys: simulations.threeRed.buyIndexes,
     sellsTwoRed: simulations.twoRed.sellIndexes,
     sellsThreeRed: simulations.threeRed.sellIndexes
   };
-  drawPriceCandles($("pullbackChart"), data.daily, pullbackHover, pullbackMarkers);
+  drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover, pullbackMarkers);
 }
 
 function renderStreakMetrics(candles) {
