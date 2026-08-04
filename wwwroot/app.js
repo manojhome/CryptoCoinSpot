@@ -26,7 +26,8 @@ const strategySelectors = {
   threeRed: { id: "strategySummary", buyDays: 3, sellDays: 3 },
   twoRed: { id: "strategyTwoRedSummary", buyDays: 3, sellDays: 2 },
   twoGreen: { id: "strategyTwoGreenSummary", buyDays: 2, sellDays: 3 },
-  twoGreenTwoRed: { id: "strategyTwoGreenTwoRedSummary", buyDays: 2, sellDays: 2 }
+  twoGreenTwoRed: { id: "strategyTwoGreenTwoRedSummary", buyDays: 2, sellDays: 2 },
+  optimal: { id: "strategyOptimalSummary", percentageBased: true }
 };
 Object.entries(strategySelectors).forEach(([key, config]) => {
   const element = $(config.id);
@@ -131,14 +132,17 @@ function clearMarketSections() {
   $("strategyTwoRedSummary").className = "strategy-summary neutral";
   $("strategyTwoGreenSummary").className = "strategy-summary neutral";
   $("strategyTwoGreenTwoRedSummary").className = "strategy-summary neutral";
+  $("strategyOptimalSummary").className = "strategy-summary neutral";
   $("strategyEndingValue").textContent = "—";
   $("strategyTwoRedEndingValue").textContent = "—";
   $("strategyTwoGreenEndingValue").textContent = "—";
   $("strategyTwoGreenTwoRedEndingValue").textContent = "—";
+  $("strategyOptimalEndingValue").textContent = "—";
   $("strategyPnl").textContent = "Market data unavailable";
   $("strategyTwoRedPnl").textContent = "Market data unavailable";
   $("strategyTwoGreenPnl").textContent = "Market data unavailable";
   $("strategyTwoGreenTwoRedPnl").textContent = "Market data unavailable";
+  $("strategyOptimalPnl").textContent = "Market data unavailable";
   for (const id of [
     "strategyEntries", "strategyExits", "strategyPosition",
     "strategyContributed", "strategyTwoRedEntries", "strategyTwoRedExits",
@@ -146,7 +150,9 @@ function clearMarketSections() {
     "strategyTwoGreenEntries", "strategyTwoGreenExits", "strategyTwoGreenPosition",
     "strategyTwoGreenContributed", "strategyTwoGreenTwoRedEntries",
     "strategyTwoGreenTwoRedExits", "strategyTwoGreenTwoRedPosition",
-    "strategyTwoGreenTwoRedContributed"
+    "strategyTwoGreenTwoRedContributed", "strategyOptimalEntries",
+    "strategyOptimalExits", "strategyOptimalPosition", "strategyOptimalContributed",
+    "strategyOptimalBuyThreshold", "strategyOptimalSellThreshold"
   ])
     $(id).textContent = "—";
   $("signal").textContent = "—";
@@ -261,10 +267,15 @@ function updateSelectedStrategyMarkers() {
     $(config.id).setAttribute("aria-pressed", String(selected));
   });
   const config = strategySelectors[selectedStrategy];
-  $("selectedBuyLegend").textContent = `Selected: buy after ${config.buyDays} green`;
-  $("selectedSellLegend").textContent = `Sell after ${config.sellDays} red`;
   if (!strategySimulations) return;
   const result = strategySimulations[selectedStrategy];
+  if (config.percentageBased) {
+    $("selectedBuyLegend").textContent = `Selected: buy at +${result.buyThreshold.toFixed(2)}% daily`;
+    $("selectedSellLegend").textContent = `Sell at −${result.sellThreshold.toFixed(2)}% daily`;
+  } else {
+    $("selectedBuyLegend").textContent = `Selected: buy after ${config.buyDays} green`;
+    $("selectedSellLegend").textContent = `Sell after ${config.sellDays} red`;
+  }
   pullbackMarkers = { buys: result.buyIndexes, sells: result.sellIndexes };
 }
 
@@ -306,6 +317,7 @@ function renderStrategySimulation(candles) {
   const twoRed = simulateStrategy(candles, 3, 2);
   const twoGreen = simulateStrategy(candles, 2, 3);
   const twoGreenTwoRed = simulateStrategy(candles, 2, 2);
+  const optimal = findOptimalPercentageStrategy(candles);
   renderStrategyResult(threeRed, {
     summary: "strategySummary",
     endingValue: "strategyEndingValue",
@@ -342,7 +354,81 @@ function renderStrategySimulation(candles) {
     exits: "strategyTwoGreenTwoRedExits",
     position: "strategyTwoGreenTwoRedPosition"
   });
-  return { threeRed, twoRed, twoGreen, twoGreenTwoRed };
+  renderStrategyResult(optimal, {
+    summary: "strategyOptimalSummary",
+    endingValue: "strategyOptimalEndingValue",
+    pnl: "strategyOptimalPnl",
+    entries: "strategyOptimalEntries",
+    contributed: "strategyOptimalContributed",
+    exits: "strategyOptimalExits",
+    position: "strategyOptimalPosition"
+  });
+  $("strategyOptimalBuyThreshold").textContent = `+${optimal.buyThreshold.toFixed(2)}%`;
+  $("strategyOptimalSellThreshold").textContent = `−${optimal.sellThreshold.toFixed(2)}%`;
+  return { threeRed, twoRed, twoGreen, twoGreenTwoRed, optimal };
+}
+
+function findOptimalPercentageStrategy(candles) {
+  const thresholds = [];
+  for (let value = .1; value <= 5.0001; value += .1) thresholds.push(Number(value.toFixed(1)));
+  for (let value = 5.5; value <= 10; value += .5) thresholds.push(value);
+  let best = null;
+  thresholds.forEach(buyThreshold => {
+    thresholds.forEach(sellThreshold => {
+      const result = simulatePercentageStrategy(candles, buyThreshold, sellThreshold);
+      if (!result.entries || !result.exits) return;
+      if (!best || result.profitPercent > best.profitPercent ||
+          (result.profitPercent === best.profitPercent && result.profit > best.profit)) best = result;
+    });
+  });
+  if (best) return best;
+
+  thresholds.forEach(buyThreshold => {
+    thresholds.forEach(sellThreshold => {
+      const result = simulatePercentageStrategy(candles, buyThreshold, sellThreshold);
+      if (!result.entries) return;
+      if (!best || result.profitPercent > best.profitPercent) best = result;
+    });
+  });
+  return best ?? simulatePercentageStrategy(candles, .1, .1);
+}
+
+function simulatePercentageStrategy(candles, buyThreshold, sellThreshold) {
+  let cash = 0;
+  let units = 0;
+  let totalContributed = 0;
+  let entries = 0;
+  let exits = 0;
+  const buyIndexes = [];
+  const sellIndexes = [];
+
+  candles.forEach((candle, index) => {
+    const open = Number(candle.open), close = Number(candle.close);
+    const dailyChange = open ? (close / open - 1) * 100 : 0;
+    if (dailyChange >= buyThreshold) {
+      totalContributed += 1000;
+      units += 1000 / close;
+      entries++;
+      buyIndexes.push(index);
+    } else if (units && dailyChange <= -sellThreshold) {
+      const holdingValue = units * close;
+      const saleValue = Math.min(1000, holdingValue);
+      units -= saleValue / close;
+      if (units < 1e-12) units = 0;
+      cash += saleValue;
+      exits++;
+      sellIndexes.push(index);
+    }
+  });
+
+  const latestClose = Number(candles.at(-1).close);
+  const endingValue = cash + units * latestClose;
+  const profit = endingValue - totalContributed;
+  const profitPercent = totalContributed ? profit / totalContributed * 100 : 0;
+  return {
+    endingValue, profit, profitPercent, entries, exits, totalContributed,
+    invested: Boolean(units), buyIndexes, sellIndexes, buyThreshold, sellThreshold
+  };
 }
 
 function simulateStrategy(candles, buyAfterGreenDays, sellAfterRedDays) {
