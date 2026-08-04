@@ -150,6 +150,9 @@ function clearMarketSections() {
   }
   $("priceRange").textContent = "Unavailable";
   $("dailyPercentRange").textContent = "Unavailable";
+  $("dailyTrend").textContent = "—";
+  $("dailyTrend").className = "trend-neutral";
+  $("dailyTrendMeta").textContent = "Unavailable";
   $("dailyRows").innerHTML = "";
   $("pullbackChartRange").textContent = "Unavailable";
   for (const id of ["greenTripleRuns", "redTripleRuns", "greenDoubleRuns", "redDoubleRuns", "averageGreenRun", "averageRedRun"])
@@ -200,6 +203,8 @@ function render(data) {
   $("unitCoin").textContent = `${data.coin} at ${aud(entryPrice, 6)} entry`;
   $("currentValue").textContent = aud(currentValue, 2);
   $("valueChange").textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}% from snapshot`;
+  const previousDailyClose = Number(data.daily.at(-1).close);
+  const dailyMove = (Number(data.currentPrice) / previousDailyClose - 1) * 100;
   $("trend").textContent = data.trend.trend;
   const trendDirection = data.trend.trend.toUpperCase();
   $("trend").className = trendDirection.includes("UP")
@@ -208,6 +213,14 @@ function render(data) {
       ? "trend-down"
       : "trend-neutral";
   $("trendMeta").textContent = `24h ${data.trend.change24HoursPercent >= 0 ? "+" : ""}${Number(data.trend.change24HoursPercent).toFixed(2)}% · RSI ${Number(data.trend.rsi14).toFixed(1)}`;
+  const dailyDirection = dailyMove > 0 ? "UP" : dailyMove < 0 ? "DOWN" : "FLAT";
+  $("dailyTrend").textContent = dailyDirection;
+  $("dailyTrend").className = dailyMove > 0
+    ? "trend-up"
+    : dailyMove < 0
+      ? "trend-down"
+      : "trend-neutral";
+  $("dailyTrendMeta").textContent = `${dailyMove >= 0 ? "+" : ""}${dailyMove.toFixed(2)}% today · previous close ${aud(previousDailyClose, 6)}`;
 
   const checks = [
     [data.signal.isAboveMovingAverage, `Above 20-day average (${aud(data.signal.movingAverage20, 6)})`],
@@ -222,8 +235,6 @@ function render(data) {
   $("finalTarget").textContent = aud(data.plan.finalTarget, 6);
   $("maxRisk").textContent = aud(data.plan.maxRiskAud, 2);
 
-  const yesterdayClose = Number(data.daily.at(-1).close);
-  const dailyMove = (Number(data.currentPrice) / yesterdayClose - 1) * 100;
   const week52Low = Math.min(...data.daily.map(x => Number(x.low)));
   const week52High = Math.max(...data.daily.map(x => Number(x.high)));
   $("week52Low").textContent = `52W low ${aud(week52Low, 6)}`;

@@ -49,7 +49,7 @@ button span { margin-left: 18px; }
 .signal { margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -.03em; }
 .signal.buy { color: var(--green-dark); }
 .explanation { margin: 0; color: var(--muted); line-height: 1.55; }
-.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 14px 0; }
+.metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin: 14px 0; }
 .metrics article, .chart-card, .rule-card, .plan-card, .daily-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
 .metrics article { padding: 20px; }
 .metrics p { margin: 0 0 14px; color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
