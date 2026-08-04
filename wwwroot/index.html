@@ -107,7 +107,7 @@
         <div class="strategy-summaries">
           <div id="strategySummary" class="strategy-summary neutral">
             <div>
-              <span>A$1,000 three-green / three-red simulation</span>
+              <span>A$1,000 — 3 consecutive green / 3 consecutive red</span>
               <strong id="strategyEndingValue">—</strong>
               <small id="strategyPnl">Waiting for stored candles</small>
             </div>
@@ -116,12 +116,12 @@
               <div><dt>Completed sells</dt><dd id="strategyExits">—</dd></div>
               <div><dt>Current position</dt><dd id="strategyPosition">—</dd></div>
             </dl>
-            <p>Buys at the third green close and sells at the third red close.</p>
+            <p>Buys only after 3 green candles in a row and sells only after 3 red candles in a row.</p>
           </div>
 
           <div id="strategyTwoRedSummary" class="strategy-summary neutral">
             <div>
-              <span>A$1,000 three-green / two-red simulation</span>
+              <span>A$1,000 — 3 consecutive green / 2 consecutive red</span>
               <strong id="strategyTwoRedEndingValue">—</strong>
               <small id="strategyTwoRedPnl">Waiting for stored candles</small>
             </div>
@@ -130,7 +130,7 @@
               <div><dt>Completed sells</dt><dd id="strategyTwoRedExits">—</dd></div>
               <div><dt>Current position</dt><dd id="strategyTwoRedPosition">—</dd></div>
             </dl>
-            <p>Buys at the third green close and sells at the second red close.</p>
+            <p>Buys only after 3 green candles in a row and sells only after 2 red candles in a row.</p>
           </div>
         </div>
         <p class="simulation-note">Both simulations reinvest the full balance. Fees, spreads, slippage and tax are excluded.</p>
