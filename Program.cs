@@ -36,16 +36,24 @@ app.MapGet("/api/dashboard", async (
 
         var hourly = await market.GetHourlyAsync(coin, 4, "aud", cancellationToken);
         IReadOnlyList<Candle> storedDaily;
-        var dailySource = "market provider + local file";
+        var dailySource = "permanent local file";
         try
         {
-            var incomingDaily = await market.GetRecentDailyAsync(coin, 366, "aud", cancellationToken);
-            storedDaily = await dailyPrices.MergeAsync(coin, incomingDaily, cancellationToken);
+            var latestCompletedUtcDay = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+            var dailyLoad = await dailyPrices.GetOrRefreshAsync(
+                coin,
+                latestCompletedUtcDay,
+                token => market.GetRecentDailyAsync(coin, 366, "aud", token),
+                cancellationToken);
+            storedDaily = dailyLoad.Candles;
+            dailySource = dailyLoad.Updated
+                ? "market provider + permanent local file"
+                : "permanent local file (already current)";
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             storedDaily = await dailyPrices.GetAsync(coin, cancellationToken);
-            dailySource = "local file fallback";
+            dailySource = "permanent local file fallback";
             if (storedDaily.Count < 21) throw;
         }
         var daily = storedDaily.TakeLast(365).ToArray();
