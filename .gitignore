@@ -49,3 +49,5 @@ Thumbs.db
 secrets.json
 appsettings.Local.json
 *.csv
+Data/*.json
+!Data/.gitkeep

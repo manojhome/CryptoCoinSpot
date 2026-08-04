@@ -135,7 +135,7 @@ function render(data) {
       ? `↓ ${Math.abs(dailyMove).toFixed(2)}% vs yesterday`
       : "Unchanged vs yesterday";
 
-  const firstVisibleIndex = Math.max(0, data.daily.length - 30);
+  const firstVisibleIndex = Math.max(0, data.daily.length - 365);
   $("dailyRows").innerHTML = data.daily.slice(firstVisibleIndex).map((x, visibleIndex) => {
     const sourceIndex = firstVisibleIndex + visibleIndex;
     const previousClose = sourceIndex > 0 ? Number(data.daily[sourceIndex - 1].close) : Number(x.close);

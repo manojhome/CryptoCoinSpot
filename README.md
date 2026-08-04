@@ -88,3 +88,11 @@ their peg and AUD/USD movement.
 Public data providers can rate-limit or change their APIs. Do not automate live
 orders without persistence, idempotency, reconciliation against CoinSpot order
 history, maximum position limits, and alerting.
+
+## Stored daily prices
+
+Dashboard requests merge completed daily candles into `Data/{COIN}-daily.json`.
+Each requested ticker gets its own file. Pullback context uses the latest 365
+stored entries, and can fall back to the local file when the daily provider is
+temporarily unavailable. Generated JSON history files are local runtime data and
+are excluded from Git; `Data/.gitkeep` preserves the directory in the repository.

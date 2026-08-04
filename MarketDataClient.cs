@@ -63,7 +63,7 @@ public sealed class MarketDataClient(HttpClient http)
     public async Task<IReadOnlyList<Candle>> GetRecentDailyAsync(
         string coin, int days, string currency, CancellationToken cancellationToken)
     {
-        if (days is < 21 or > 365) throw new ArgumentOutOfRangeException(nameof(days));
+        if (days is < 21 or > 366) throw new ArgumentOutOfRangeException(nameof(days));
         var symbol = CoinSpotClient.NormalizeCoin(coin);
         var candles = await GetKuCoinCandlesAsync(
             symbol, "1day", DateTimeOffset.UtcNow.AddDays(-days), currency, cancellationToken);

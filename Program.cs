@@ -4,6 +4,8 @@ using Microsoft.Extensions.Caching.Memory;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton(new DailyPriceStore(
+    Path.Combine(builder.Environment.ContentRootPath, "Data")));
 builder.Services.AddHttpClient<MarketDataClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
@@ -23,6 +25,7 @@ app.MapGet("/api/dashboard", async (
     string coin,
     decimal amount,
     MarketDataClient market,
+    DailyPriceStore dailyPrices,
     CancellationToken cancellationToken) =>
 {
     try
@@ -32,7 +35,20 @@ app.MapGet("/api/dashboard", async (
             return Results.BadRequest(new { error = "Investment amount must be between A$0.01 and A$100,000,000." });
 
         var hourly = await market.GetHourlyAsync(coin, 4, "aud", cancellationToken);
-        var daily = await market.GetRecentDailyAsync(coin, 365, "aud", cancellationToken);
+        IReadOnlyList<Candle> storedDaily;
+        var dailySource = "market provider + local file";
+        try
+        {
+            var incomingDaily = await market.GetRecentDailyAsync(coin, 366, "aud", cancellationToken);
+            storedDaily = await dailyPrices.MergeAsync(coin, incomingDaily, cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            storedDaily = await dailyPrices.GetAsync(coin, cancellationToken);
+            dailySource = "local file fallback";
+            if (storedDaily.Count < 21) throw;
+        }
+        var daily = storedDaily.TakeLast(365).ToArray();
         var signal = TrxStrategy.Evaluate(coin, daily);
         var trend = Analysis.CalculateTrend(coin, hourly);
         var current = hourly[^1].Close;
@@ -73,6 +89,7 @@ app.MapGet("/api/dashboard", async (
                 x.Close,
                 x.Volume
             }),
+            dailySource,
             refreshedAt = DateTimeOffset.UtcNow
         });
     }
