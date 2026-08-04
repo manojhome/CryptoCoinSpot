@@ -297,8 +297,11 @@ function simulateStrategy(candles, sellAfterRedDays) {
       entries++;
       buyIndexes.push(index);
     } else if (units && redDays === sellAfterRedDays) {
-      cash += units * close;
-      units = 0;
+      const holdingValue = units * close;
+      const saleValue = Math.min(1000, holdingValue);
+      units -= saleValue / close;
+      if (units < 1e-12) units = 0;
+      cash += saleValue;
       exits++;
       sellIndexes.push(index);
     }
