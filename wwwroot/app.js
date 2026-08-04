@@ -126,7 +126,7 @@ function clearMarketSections() {
   $("valueRange").textContent = "Unavailable";
   $("dailyRows").innerHTML = "";
   $("pullbackChartRange").textContent = "Unavailable";
-  for (const id of ["greenTripleRuns", "redTripleRuns", "averageGreenRun", "averageRedRun"])
+  for (const id of ["greenTripleRuns", "redTripleRuns", "greenDoubleRuns", "redDoubleRuns", "averageGreenRun", "averageRedRun"])
     $(id).textContent = "—";
   $("strategySummary").className = "strategy-summary neutral";
   $("strategyTwoRedSummary").className = "strategy-summary neutral";
@@ -309,6 +309,8 @@ function renderStreakMetrics(candles) {
     : 0;
   $("greenTripleRuns").textContent = runs.green.filter(value => value >= 3).length;
   $("redTripleRuns").textContent = runs.red.filter(value => value >= 3).length;
+  $("greenDoubleRuns").textContent = runs.green.filter(value => value >= 2).length;
+  $("redDoubleRuns").textContent = runs.red.filter(value => value >= 2).length;
   $("averageGreenRun").textContent = average(runs.green).toFixed(2);
   $("averageRedRun").textContent = average(runs.red).toFixed(2);
 }
