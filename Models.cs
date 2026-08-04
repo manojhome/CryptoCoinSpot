@@ -41,3 +41,10 @@ public sealed record TrxSignal(
     bool IsAboveMovingAverage,
     bool HasGreenBreakout,
     bool HasAboveAverageVolume);
+
+public sealed record MarketGainer(
+    int Rank,
+    string Coin,
+    string Name,
+    decimal PriceAud,
+    decimal Change24HoursPercent);

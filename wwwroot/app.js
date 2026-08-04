@@ -1,5 +1,6 @@
 const $ = id => document.getElementById(id);
 let snapshot = null;
+let gainersSnapshot = null;
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
@@ -10,7 +11,10 @@ const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFra
 $("analyse").addEventListener("click", analyse);
 $("coin").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
 $("amount").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
-window.addEventListener("resize", () => snapshot && drawCharts(snapshot));
+window.addEventListener("resize", () => {
+  if (snapshot) drawCharts(snapshot);
+  if (gainersSnapshot) drawGainers(gainersSnapshot);
+});
 
 async function analyse(isAutomatic = false) {
   const coin = $("coin").value.trim().toUpperCase();
@@ -68,6 +72,10 @@ function render(data) {
 
   const yesterdayClose = Number(data.daily.at(-1).close);
   const dailyMove = (Number(data.currentPrice) / yesterdayClose - 1) * 100;
+  const week52Low = Math.min(...data.daily.map(x => Number(x.low)));
+  const week52High = Math.max(...data.daily.map(x => Number(x.high)));
+  $("week52Low").textContent = `52W low ${aud(week52Low, 6)}`;
+  $("week52High").textContent = `52W high ${aud(week52High, 6)}`;
   const direction = dailyMove > 0 ? "up" : dailyMove < 0 ? "down" : "neutral";
   const card = $("pullbackCard");
   card.classList.remove("up", "down", "neutral");
@@ -78,10 +86,19 @@ function render(data) {
       ? `↓ ${Math.abs(dailyMove).toFixed(2)}% vs yesterday`
       : "Unchanged vs yesterday";
 
-  $("dailyRows").innerHTML = data.daily.slice(-7).reverse().map(x => `<tr>
-    <td>${new Date(x.time).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</td>
-    <td>${number(x.open, 5)}</td><td>${number(x.high, 5)}</td><td>${number(x.low, 5)}</td><td>${number(x.close, 5)}</td>
-  </tr>`).join("");
+  const firstVisibleIndex = Math.max(0, data.daily.length - 30);
+  $("dailyRows").innerHTML = data.daily.slice(firstVisibleIndex).map((x, visibleIndex) => {
+    const sourceIndex = firstVisibleIndex + visibleIndex;
+    const previousClose = sourceIndex > 0 ? Number(data.daily[sourceIndex - 1].close) : Number(x.close);
+    const close = Number(x.close);
+    const changePercent = previousClose ? (close / previousClose - 1) * 100 : 0;
+    const rowDirection = close > previousClose ? "day-up" : close < previousClose ? "day-down" : "day-flat";
+    return `<tr class="${rowDirection}">
+      <td>${new Date(x.time).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</td>
+      <td>${number(x.open, 5)}</td><td>${number(x.high, 5)}</td><td>${number(x.low, 5)}</td><td>${number(x.close, 5)}</td>
+      <td class="change-cell">${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%</td>
+    </tr>`;
+  }).reverse().join("");
   $("refreshState").textContent = "Live paper view";
   drawCharts(data);
 }
@@ -90,10 +107,110 @@ function drawCharts(data) {
   const prices = data.hourly.map(x => Number(x.price));
   const units = data.amount / entryPrice;
   const values = prices.map(x => x * units);
-  drawLine($("priceChart"), prices, "#12a66a", "rgba(18,166,106,.13)");
+  drawCandles($("priceChart"), data.hourly);
   drawLine($("valueChart"), values, "#10201b", "rgba(200,240,108,.26)");
   $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
   $("valueRange").textContent = `${aud(Math.min(...values), 2)} — ${aud(Math.max(...values), 2)}`;
+}
+
+async function loadGainers() {
+  $("gainersStatus").textContent = "Loading ranking…";
+  try {
+    const response = await fetch("/api/gainers");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Gainers update failed.");
+    gainersSnapshot = data.items;
+    drawGainers(data.items);
+    $("gainersStatus").textContent = `${data.items.length} assets · refreshed ${new Date().toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+  } catch (error) {
+    $("gainersStatus").textContent = `Unavailable: ${error.message}`;
+  }
+}
+
+function drawGainers(items) {
+  const canvas = $("gainersChart");
+  const rowHeight = 29;
+  const cssHeight = Math.max(180, items.length * rowHeight + 28);
+  canvas.style.height = `${cssHeight}px`;
+  const ratio = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth;
+  canvas.width = width * ratio; canvas.height = cssHeight * ratio;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ratio, ratio);
+  ctx.font = "11px ui-monospace, Consolas, monospace";
+  ctx.textBaseline = "middle";
+  const labelWidth = 88;
+  const valueWidth = 150;
+  const barWidth = Math.max(80, width - labelWidth - valueWidth - 18);
+  const maxMagnitude = Math.max(1, ...items.map(x => Math.abs(Number(x.change24HoursPercent))));
+
+  items.forEach((item, index) => {
+    const y = 14 + index * rowHeight;
+    const change = Number(item.change24HoursPercent);
+    const colour = change >= 0 ? "#12a66a" : "#d84d4d";
+    if (index % 2) { ctx.fillStyle = "rgba(16,32,27,.025)"; ctx.fillRect(0, y - 13, width, rowHeight); }
+    ctx.fillStyle = "#64736e"; ctx.textAlign = "right";
+    ctx.fillText(`#${item.rank}`, 28, y);
+    ctx.fillStyle = "#10201b"; ctx.textAlign = "left"; ctx.font = "700 11px ui-monospace, Consolas, monospace";
+    ctx.fillText(item.coin, 36, y);
+    ctx.font = "11px ui-monospace, Consolas, monospace";
+    ctx.fillStyle = colour;
+    ctx.fillRect(labelWidth, y - 7, Math.max(2, Math.abs(change) / maxMagnitude * barWidth), 14);
+    ctx.textAlign = "right"; ctx.font = "700 11px ui-monospace, Consolas, monospace";
+    ctx.fillText(`${change >= 0 ? "+" : ""}${change.toFixed(2)}%`, width - 76, y);
+    ctx.fillStyle = "#64736e"; ctx.font = "10px ui-monospace, Consolas, monospace";
+    ctx.fillText(aud(item.priceAud, item.priceAud < 1 ? 6 : 2), width - 4, y);
+  });
+}
+
+function drawCandles(canvas, candles) {
+  const ratio = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  canvas.width = width * ratio; canvas.height = height * ratio;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ratio, ratio);
+
+  const left = 12, right = 8, top = 12, bottom = 32;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const lows = candles.map(x => Number(x.low));
+  const highs = candles.map(x => Number(x.high));
+  const min = Math.min(...lows), max = Math.max(...highs), range = max - min || 1;
+  const y = value => top + (max - value) / range * plotHeight;
+  const step = plotWidth / candles.length;
+  const bodyWidth = Math.max(2, Math.min(7, step * .68));
+
+  ctx.strokeStyle = "#e4e9e2"; ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const gridY = top + i * plotHeight / 3;
+    ctx.beginPath(); ctx.moveTo(left, gridY); ctx.lineTo(width - right, gridY); ctx.stroke();
+  }
+
+  candles.forEach((candle, index) => {
+    const open = Number(candle.open), close = Number(candle.close);
+    const high = Number(candle.high), low = Number(candle.low);
+    const x = left + (index + .5) * step;
+    const colour = close >= open ? "#12a66a" : "#d84d4d";
+    ctx.strokeStyle = colour; ctx.fillStyle = colour; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y(high)); ctx.lineTo(x, y(low)); ctx.stroke();
+    const bodyTop = y(Math.max(open, close));
+    const bodyHeight = Math.max(1.5, Math.abs(y(open) - y(close)));
+    ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+  });
+
+  ctx.fillStyle = "#64736e";
+  ctx.font = "10px ui-monospace, Consolas, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  const labelEvery = width < 600 ? 24 : 12;
+  candles.forEach((candle, index) => {
+    if (index % labelEvery !== 0 && index !== candles.length - 1) return;
+    const time = new Date(candle.time);
+    const label = `${time.toLocaleDateString("en-AU", { day: "2-digit", month: "short" })} ${time.toLocaleTimeString("en-AU", { hour: "2-digit", hour12: false })}`;
+    const x = left + (index + .5) * step;
+    ctx.fillText(label, Math.max(34, Math.min(width - 34, x)), height - 3);
+  });
 }
 
 function drawLine(canvas, values, stroke, fill) {
@@ -127,3 +244,4 @@ function hideError() { $("error").hidden = true; }
 function escapeHtml(value) { const node = document.createElement("span"); node.textContent = value; return node.innerHTML; }
 
 analyse();
+loadGainers();

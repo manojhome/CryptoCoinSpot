@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace CryptoTrader;
 
@@ -63,7 +64,7 @@ public sealed class MarketDataClient(HttpClient http)
     public async Task<IReadOnlyList<Candle>> GetRecentDailyAsync(
         string coin, int days, string currency, CancellationToken cancellationToken)
     {
-        if (days is < 21 or > 90) throw new ArgumentOutOfRangeException(nameof(days));
+        if (days is < 21 or > 365) throw new ArgumentOutOfRangeException(nameof(days));
         var id = ResolveId(coin);
         var uri = $"{Root}/coins/{id}/market_chart?vs_currency={currency.ToLowerInvariant()}&days={days}";
         using var response = await GetWithRateLimitRetryAsync(uri, cancellationToken);
@@ -100,6 +101,60 @@ public sealed class MarketDataClient(HttpClient http)
                     ordered[^1].Volume);
             })
             .OrderBy(x => x.Time)
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<MarketGainer>> GetTopCoinSpotGainersAsync(
+        int limit, CancellationToken cancellationToken)
+    {
+        if (limit is < 1 or > 50) throw new ArgumentOutOfRangeException(nameof(limit));
+
+        using var sitemapResponse = await http.GetAsync(
+            "https://www.coinspot.com.au/sitemap.xml", cancellationToken);
+        var sitemap = await sitemapResponse.Content.ReadAsStringAsync(cancellationToken);
+        if (!sitemapResponse.IsSuccessStatusCode)
+            throw new HttpRequestException($"CoinSpot listing returned {(int)sitemapResponse.StatusCode}.");
+
+        var listed = Regex.Matches(
+                sitemap,
+                @"https://www\.coinspot\.com\.au/chart/([^<]+)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            .Select(x => Uri.UnescapeDataString(x.Groups[1].Value).ToUpperInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var candidates = new List<(string Coin, string Name, decimal Price, decimal Change)>();
+        for (var page = 1; page <= 2; page++)
+        {
+            var uri = $"{Root}/coins/markets?vs_currency=aud&order=market_cap_desc" +
+                      $"&per_page=250&page={page}&sparkline=false&price_change_percentage=24h";
+            using var response = await GetWithRateLimitRetryAsync(uri, cancellationToken);
+            var text = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"Gainers market data returned {(int)response.StatusCode}: {text}");
+            using var json = JsonDocument.Parse(text);
+            foreach (var item in json.RootElement.EnumerateArray())
+            {
+                var symbol = item.GetProperty("symbol").GetString()?.ToUpperInvariant();
+                if (symbol is null || !listed.Contains(symbol)) continue;
+                if (!item.TryGetProperty("current_price", out var priceElement) ||
+                    priceElement.ValueKind != JsonValueKind.Number ||
+                    !item.TryGetProperty("price_change_percentage_24h", out var changeElement) ||
+                    changeElement.ValueKind != JsonValueKind.Number) continue;
+                candidates.Add((
+                    symbol,
+                    item.GetProperty("name").GetString() ?? symbol,
+                    priceElement.GetDecimal(),
+                    changeElement.GetDecimal()));
+            }
+            if (page < 2) await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+
+        return candidates
+            .GroupBy(x => x.Coin, StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.First())
+            .OrderByDescending(x => x.Change)
+            .Take(limit)
+            .Select((x, index) => new MarketGainer(index + 1, x.Coin, x.Name, x.Price, x.Change))
             .ToArray();
     }
 

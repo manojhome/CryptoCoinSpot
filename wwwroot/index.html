@@ -35,6 +35,15 @@
     <div id="error" class="error" role="alert" hidden></div>
 
     <section id="dashboard" hidden>
+      <article class="gainers-card chart-card">
+        <div class="card-head">
+          <div><p class="label">COINSPOT-LISTED / 24 HOURS</p><h2>Top 50 gainers</h2></div>
+          <span id="gainersStatus">Loading ranking…</span>
+        </div>
+        <p class="data-note">CoinSpot supplies the listing universe. Percentage change and reference AUD price use the market-data feed because CoinSpot’s public latest-price API does not include 24-hour change.</p>
+        <div class="gainers-scroll"><canvas id="gainersChart" aria-label="Top 50 CoinSpot-listed gainers chart"></canvas></div>
+      </article>
+
       <div class="signal-strip">
         <div>
           <p class="label">Strategy signal</p>
@@ -78,13 +87,17 @@
           </dl>
         </article>
         <article id="pullbackCard" class="daily-card neutral">
-          <p class="label">LATEST DAILY CANDLES</p>
+          <p class="label">LATEST 30 DAILY CANDLES</p>
           <div class="pullback-heading">
-            <h2>Pullback context</h2>
-            <span id="dailyDirection" class="direction-badge">Waiting for data</span>
+            <h2>Pullback context <small>— Last 30 days</small></h2>
+            <div class="pullback-meta">
+              <span id="week52Low" class="range-badge range-low">52W low —</span>
+              <span id="week52High" class="range-badge range-high">52W high —</span>
+              <span id="dailyDirection" class="direction-badge">Waiting for data</span>
+            </div>
           </div>
           <div class="table-wrap">
-            <table><thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th></tr></thead><tbody id="dailyRows"></tbody></table>
+            <table><thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Change %</th></tr></thead><tbody id="dailyRows"></tbody></table>
           </div>
         </article>
       </div>

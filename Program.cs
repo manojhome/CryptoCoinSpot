@@ -1,6 +1,8 @@
 using CryptoTrader;
+using Microsoft.Extensions.Caching.Memory;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<MarketDataClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
@@ -25,7 +27,7 @@ app.MapGet("/api/dashboard", async (
 
         var hourly = await market.GetHourlyAsync(coin, 4, "aud", cancellationToken);
         await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-        var daily = await market.GetRecentDailyAsync(coin, 45, "aud", cancellationToken);
+        var daily = await market.GetRecentDailyAsync(coin, 365, "aud", cancellationToken);
         var signal = TrxStrategy.Evaluate(coin, daily);
         var trend = Analysis.CalculateTrend(coin, hourly);
         var current = hourly[^1].Close;
@@ -48,7 +50,15 @@ app.MapGet("/api/dashboard", async (
                 finalTarget = current * 1.10m,
                 maxRiskAud = amount * 0.01m
             },
-            hourly = hourly.Select(x => new { time = x.Time, price = x.Close }),
+            hourly = hourly.Select(x => new
+            {
+                time = x.Time,
+                x.Open,
+                x.High,
+                x.Low,
+                x.Close,
+                price = x.Close
+            }),
             daily = daily.Select(x => new
             {
                 time = x.Time,
@@ -64,6 +74,33 @@ app.MapGet("/api/dashboard", async (
     catch (ArgumentException ex)
     {
         return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
+app.MapGet("/api/gainers", async (
+    MarketDataClient market,
+    Microsoft.Extensions.Caching.Memory.IMemoryCache cache,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var gainers = await cache.GetOrCreateAsync(
+            "coinspot-top-50-gainers",
+            async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
+                return await market.GetTopCoinSpotGainersAsync(50, cancellationToken);
+            });
+        return Results.Ok(new
+        {
+            period = "24h",
+            source = "CoinSpot-listed assets; change and reference price from CoinGecko",
+            items = gainers ?? []
+        });
     }
     catch (Exception ex)
     {
