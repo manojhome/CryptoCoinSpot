@@ -56,8 +56,21 @@
           <canvas id="priceChart" aria-label="Interactive 96-hour red and green OHLC candlestick chart with AUD price axis"></canvas>
         </article>
         <article class="chart-card">
-          <div class="card-head"><div><p class="label">POSITION</p><h2>Paper investment value</h2></div><span id="valueRange">—</span></div>
-          <canvas id="valueChart" aria-label="Hourly paper investment value chart"></canvas>
+          <div class="card-head">
+            <div><p class="label">DAILY MARKET MOVE</p><h2>Daily percentage gain / loss</h2></div>
+            <div class="pullback-controls">
+              <label for="dailyPercentPeriod">Period</label>
+              <select id="dailyPercentPeriod">
+                <option value="365">365 days</option>
+                <option value="183" selected>6 months</option>
+                <option value="90">3 months</option>
+                <option value="30">1 month</option>
+                <option value="7">1 week</option>
+              </select>
+              <span id="dailyPercentRange">—</span>
+            </div>
+          </div>
+          <canvas id="dailyPercentChart" aria-label="Interactive daily percentage gain and loss bar chart"></canvas>
         </article>
       </div>
 
