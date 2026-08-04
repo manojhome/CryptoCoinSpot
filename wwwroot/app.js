@@ -493,7 +493,13 @@ function renderStrategyResult(result, ids) {
   const summary = $(ids.summary);
   summary.className = `strategy-summary ${result.profit > 0 ? "profit" : result.profit < 0 ? "loss" : "neutral"}`;
   $(ids.endingValue).textContent = aud(result.endingValue, 2);
-  $(ids.pnl).textContent = `${result.profit >= 0 ? "+" : "−"}${aud(Math.abs(result.profit), 2)} (${result.profit >= 0 ? "+" : ""}${result.profitPercent.toFixed(2)}%)`;
+  const pnl = $(ids.pnl);
+  const percentage = document.createElement("span");
+  percentage.className = "strategy-return-percent";
+  percentage.textContent = `(${result.profit >= 0 ? "+" : ""}${result.profitPercent.toFixed(2)}%)`;
+  pnl.replaceChildren(
+    document.createTextNode(`${result.profit >= 0 ? "+" : "−"}${aud(Math.abs(result.profit), 2)} `),
+    percentage);
   $(ids.entries).textContent = result.entries;
   $(ids.contributed).textContent = aud(result.totalContributed, 0);
   $(ids.exits).textContent = result.exits;
