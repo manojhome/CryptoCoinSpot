@@ -248,7 +248,8 @@ function drawPullbackAnalysis(allCandles) {
   const dailyHighs = pullbackCandles.map(x => Number(x.high));
   $("pullbackChartRange").textContent = `${pullbackCandles.length} days · ${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
   renderStreakMetrics(pullbackCandles);
-  strategySimulations = renderStrategySimulation(pullbackCandles);
+  const investmentAmount = Number(snapshot?.amount) || 1000;
+  strategySimulations = renderStrategySimulation(pullbackCandles, investmentAmount);
   updateSelectedStrategyMarkers();
   drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover, pullbackMarkers);
 }
@@ -312,12 +313,19 @@ function renderStreakMetrics(candles) {
   $("averageRedRun").textContent = average(runs.red).toFixed(2);
 }
 
-function renderStrategySimulation(candles) {
-  const threeRed = simulateStrategy(candles, 3, 3);
-  const twoRed = simulateStrategy(candles, 3, 2);
-  const twoGreen = simulateStrategy(candles, 2, 3);
-  const twoGreenTwoRed = simulateStrategy(candles, 2, 2);
-  const optimal = findOptimalPercentageStrategy(candles);
+function renderStrategySimulation(candles, investmentAmount) {
+  const amountLabel = aud(investmentAmount, 2);
+  $("strategyThreeRedTitle").textContent = `${amountLabel} per signal — 3 consecutive green / 3 consecutive red`;
+  $("strategyTwoRedTitle").textContent = `${amountLabel} per signal — 3 consecutive green / 2 consecutive red`;
+  $("strategyTwoGreenTitle").textContent = `${amountLabel} per signal — 2 consecutive green / 3 consecutive red`;
+  $("strategyTwoGreenTwoRedTitle").textContent = `${amountLabel} per signal — 2 consecutive green / 2 consecutive red`;
+  $("strategyOptimalTitle").textContent = `${amountLabel} per signal — historical daily-percentage optimiser`;
+  $("simulationNote").textContent = `Each qualifying buy contributes ${amountLabel}. Each qualifying sell converts ${amountLabel} only—not the full accumulated holding. Profit/loss is measured against total contributions. Fees, spreads, slippage and tax are excluded.`;
+  const threeRed = simulateStrategy(candles, 3, 3, investmentAmount);
+  const twoRed = simulateStrategy(candles, 3, 2, investmentAmount);
+  const twoGreen = simulateStrategy(candles, 2, 3, investmentAmount);
+  const twoGreenTwoRed = simulateStrategy(candles, 2, 2, investmentAmount);
+  const optimal = findOptimalPercentageStrategy(candles, investmentAmount);
   renderStrategyResult(threeRed, {
     summary: "strategySummary",
     endingValue: "strategyEndingValue",
@@ -368,14 +376,14 @@ function renderStrategySimulation(candles) {
   return { threeRed, twoRed, twoGreen, twoGreenTwoRed, optimal };
 }
 
-function findOptimalPercentageStrategy(candles) {
+function findOptimalPercentageStrategy(candles, investmentAmount) {
   const thresholds = [];
   for (let value = .1; value <= 5.0001; value += .1) thresholds.push(Number(value.toFixed(1)));
   for (let value = 5.5; value <= 10; value += .5) thresholds.push(value);
   let best = null;
   thresholds.forEach(buyThreshold => {
     thresholds.forEach(sellThreshold => {
-      const result = simulatePercentageStrategy(candles, buyThreshold, sellThreshold);
+      const result = simulatePercentageStrategy(candles, buyThreshold, sellThreshold, investmentAmount);
       if (!result.entries || !result.exits) return;
       if (!best || result.profitPercent > best.profitPercent ||
           (result.profitPercent === best.profitPercent && result.profit > best.profit)) best = result;
@@ -385,15 +393,15 @@ function findOptimalPercentageStrategy(candles) {
 
   thresholds.forEach(buyThreshold => {
     thresholds.forEach(sellThreshold => {
-      const result = simulatePercentageStrategy(candles, buyThreshold, sellThreshold);
+      const result = simulatePercentageStrategy(candles, buyThreshold, sellThreshold, investmentAmount);
       if (!result.entries) return;
       if (!best || result.profitPercent > best.profitPercent) best = result;
     });
   });
-  return best ?? simulatePercentageStrategy(candles, .1, .1);
+  return best ?? simulatePercentageStrategy(candles, .1, .1, investmentAmount);
 }
 
-function simulatePercentageStrategy(candles, buyThreshold, sellThreshold) {
+function simulatePercentageStrategy(candles, buyThreshold, sellThreshold, investmentAmount) {
   let cash = 0;
   let units = 0;
   let totalContributed = 0;
@@ -406,13 +414,13 @@ function simulatePercentageStrategy(candles, buyThreshold, sellThreshold) {
     const open = Number(candle.open), close = Number(candle.close);
     const dailyChange = open ? (close / open - 1) * 100 : 0;
     if (dailyChange >= buyThreshold) {
-      totalContributed += 1000;
-      units += 1000 / close;
+      totalContributed += investmentAmount;
+      units += investmentAmount / close;
       entries++;
       buyIndexes.push(index);
     } else if (units && dailyChange <= -sellThreshold) {
       const holdingValue = units * close;
-      const saleValue = Math.min(1000, holdingValue);
+      const saleValue = Math.min(investmentAmount, holdingValue);
       units -= saleValue / close;
       if (units < 1e-12) units = 0;
       cash += saleValue;
@@ -431,8 +439,7 @@ function simulatePercentageStrategy(candles, buyThreshold, sellThreshold) {
   };
 }
 
-function simulateStrategy(candles, buyAfterGreenDays, sellAfterRedDays) {
-  const contributionPerSignal = 1000;
+function simulateStrategy(candles, buyAfterGreenDays, sellAfterRedDays, contributionPerSignal) {
   let cash = 0;
   let units = 0;
   let totalContributed = 0;
@@ -463,7 +470,7 @@ function simulateStrategy(candles, buyAfterGreenDays, sellAfterRedDays) {
       buyIndexes.push(index);
     } else if (units && redDays === sellAfterRedDays) {
       const holdingValue = units * close;
-      const saleValue = Math.min(1000, holdingValue);
+      const saleValue = Math.min(contributionPerSignal, holdingValue);
       units -= saleValue / close;
       if (units < 1e-12) units = 0;
       cash += saleValue;
