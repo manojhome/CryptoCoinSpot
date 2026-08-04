@@ -58,8 +58,8 @@ button span { margin-left: 18px; }
 .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .chart-card { min-width: 0; padding: 20px; }
 .gainers-card, .wallet-card { min-width: 0; }
-.wallet-card { margin-top: 14px; }
-.gainers-card { width: 50%; margin-top: 14px; }
+.bottom-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.gainers-card, .wallet-card { width: 100%; }
 .data-note { margin: 7px 0 14px; max-width: 900px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .gainers-scroll, .wallet-scroll { max-height: 620px; overflow: auto; border-top: 1px solid var(--line); }
 .gainers-scroll canvas, .wallet-scroll canvas { min-width: 620px; margin-top: 0; }
@@ -107,7 +107,7 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .hero { align-items: flex-start; flex-direction: column; }
   .control-panel { grid-template-columns: 1fr 1fr; }
   .control-panel button { grid-column: 1 / -1; }
-  .gainers-card { width: 100%; }
+  .bottom-charts { grid-template-columns: 1fr; }
   .metrics { grid-template-columns: 1fr 1fr; }
   .charts, .lower-grid { grid-template-columns: 1fr; }
 }
