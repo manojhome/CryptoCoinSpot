@@ -100,6 +100,11 @@ function clearMarketSections() {
   $("pullbackChartRange").textContent = "Unavailable";
   for (const id of ["greenTripleRuns", "redTripleRuns", "averageGreenRun", "averageRedRun"])
     $(id).textContent = "—";
+  $("strategySummary").className = "strategy-summary neutral";
+  $("strategyEndingValue").textContent = "—";
+  $("strategyPnl").textContent = "Market data unavailable";
+  for (const id of ["strategyEntries", "strategyExits", "strategyPosition"])
+    $(id).textContent = "—";
   $("signal").textContent = "—";
   $("explanation").textContent = "Market data is temporarily unavailable. Wallet and gainers can still refresh independently.";
 }
@@ -187,6 +192,7 @@ function drawCharts(data) {
   const dailyHighs = data.daily.map(x => Number(x.high));
   $("pullbackChartRange").textContent = `${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
   renderStreakMetrics(data.daily);
+  renderStrategySimulation(data.daily);
 }
 
 function renderStreakMetrics(candles) {
@@ -220,6 +226,52 @@ function renderStreakMetrics(candles) {
   $("redTripleRuns").textContent = runs.red.filter(value => value >= 3).length;
   $("averageGreenRun").textContent = average(runs.green).toFixed(2);
   $("averageRedRun").textContent = average(runs.red).toFixed(2);
+}
+
+function renderStrategySimulation(candles) {
+  const startingCapital = 1000;
+  let cash = startingCapital;
+  let units = 0;
+  let greenDays = 0;
+  let redDays = 0;
+  let entries = 0;
+  let exits = 0;
+
+  candles.forEach(candle => {
+    const open = Number(candle.open), close = Number(candle.close);
+    if (close > open) {
+      greenDays++;
+      redDays = 0;
+    } else if (close < open) {
+      redDays++;
+      greenDays = 0;
+    } else {
+      greenDays = 0;
+      redDays = 0;
+    }
+
+    if (!units && greenDays === 3) {
+      units = cash / close;
+      cash = 0;
+      entries++;
+    } else if (units && redDays === 3) {
+      cash = units * close;
+      units = 0;
+      exits++;
+    }
+  });
+
+  const latestClose = Number(candles.at(-1).close);
+  const endingValue = units ? units * latestClose : cash;
+  const profit = endingValue - startingCapital;
+  const profitPercent = profit / startingCapital * 100;
+  const summary = $("strategySummary");
+  summary.className = `strategy-summary ${profit > 0 ? "profit" : profit < 0 ? "loss" : "neutral"}`;
+  $("strategyEndingValue").textContent = aud(endingValue, 2);
+  $("strategyPnl").textContent = `${profit >= 0 ? "+" : "−"}${aud(Math.abs(profit), 2)} (${profit >= 0 ? "+" : ""}${profitPercent.toFixed(2)}%)`;
+  $("strategyEntries").textContent = entries;
+  $("strategyExits").textContent = exits;
+  $("strategyPosition").textContent = units ? "Invested" : "Cash";
 }
 
 async function loadGainers() {

@@ -104,6 +104,19 @@
           <div class="streak-green"><span>Average green run</span><strong id="averageGreenRun">—</strong><small>consecutive days</small></div>
           <div class="streak-red"><span>Average red run</span><strong id="averageRedRun">—</strong><small>consecutive days</small></div>
         </div>
+        <div id="strategySummary" class="strategy-summary neutral">
+          <div>
+            <span>A$1,000 three-green / three-red simulation</span>
+            <strong id="strategyEndingValue">—</strong>
+            <small id="strategyPnl">Waiting for stored candles</small>
+          </div>
+          <dl>
+            <div><dt>Buy signals</dt><dd id="strategyEntries">—</dd></div>
+            <div><dt>Completed sells</dt><dd id="strategyExits">—</dd></div>
+            <div><dt>Current position</dt><dd id="strategyPosition">—</dd></div>
+          </dl>
+          <p>Buys at the third green daily close, sells at the third red daily close, and reinvests the full balance. Fees, spreads and tax are excluded.</p>
+        </div>
         <canvas id="pullbackChart" aria-label="Interactive 365-day pullback context OHLC candlestick chart"></canvas>
       </article>
 
