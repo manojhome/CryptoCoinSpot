@@ -144,10 +144,26 @@
             </dl>
             <p>Buys A$1,000 after 3 green candles in a row and sells only A$1,000 after 2 red candles in a row.</p>
           </div>
+
+          <div id="strategyTwoGreenSummary" class="strategy-summary neutral">
+            <div>
+              <span>A$1,000 per signal — 2 consecutive green / 3 consecutive red</span>
+              <strong id="strategyTwoGreenEndingValue">—</strong>
+              <small id="strategyTwoGreenPnl">Waiting for stored candles</small>
+            </div>
+            <dl>
+              <div><dt>Buy signals</dt><dd id="strategyTwoGreenEntries">—</dd></div>
+              <div><dt>Total contributed</dt><dd id="strategyTwoGreenContributed">—</dd></div>
+              <div><dt>Completed sells</dt><dd id="strategyTwoGreenExits">—</dd></div>
+              <div><dt>Current position</dt><dd id="strategyTwoGreenPosition">—</dd></div>
+            </dl>
+            <p>Buys A$1,000 after 2 green candles in a row and sells only A$1,000 after 3 red candles in a row.</p>
+          </div>
         </div>
         <p class="simulation-note">Each distinct 3-green streak contributes and buys A$1,000. Each qualifying red signal sells A$1,000 only—not the full accumulated holding. Profit/loss is measured against total contributions. Fees, spreads, slippage and tax are excluded.</p>
         <div class="signal-legend" aria-label="Pullback chart signal line legend">
           <span class="legend-buy">Buy after 3 green</span>
+          <span class="legend-buy-two">Buy after 2 green</span>
           <span class="legend-sell-two">Sell after 2 red</span>
           <span class="legend-sell-three">Sell after 3 red</span>
         </div>

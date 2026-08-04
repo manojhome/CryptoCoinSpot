@@ -110,14 +110,19 @@ function clearMarketSections() {
     $(id).textContent = "—";
   $("strategySummary").className = "strategy-summary neutral";
   $("strategyTwoRedSummary").className = "strategy-summary neutral";
+  $("strategyTwoGreenSummary").className = "strategy-summary neutral";
   $("strategyEndingValue").textContent = "—";
   $("strategyTwoRedEndingValue").textContent = "—";
+  $("strategyTwoGreenEndingValue").textContent = "—";
   $("strategyPnl").textContent = "Market data unavailable";
   $("strategyTwoRedPnl").textContent = "Market data unavailable";
+  $("strategyTwoGreenPnl").textContent = "Market data unavailable";
   for (const id of [
     "strategyEntries", "strategyExits", "strategyPosition",
     "strategyContributed", "strategyTwoRedEntries", "strategyTwoRedExits",
-    "strategyTwoRedPosition", "strategyTwoRedContributed"
+    "strategyTwoRedPosition", "strategyTwoRedContributed",
+    "strategyTwoGreenEntries", "strategyTwoGreenExits", "strategyTwoGreenPosition",
+    "strategyTwoGreenContributed"
   ])
     $(id).textContent = "—";
   $("signal").textContent = "—";
@@ -216,8 +221,12 @@ function drawPullbackAnalysis(allCandles) {
   const simulations = renderStrategySimulation(pullbackCandles);
   pullbackMarkers = {
     buys: simulations.threeRed.buyIndexes,
+    buysTwoGreen: simulations.twoGreen.buyIndexes,
     sellsTwoRed: simulations.twoRed.sellIndexes,
-    sellsThreeRed: simulations.threeRed.sellIndexes
+    sellsThreeRed: [...new Set([
+      ...simulations.threeRed.sellIndexes,
+      ...simulations.twoGreen.sellIndexes
+    ])]
   };
   drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover, pullbackMarkers);
 }
@@ -256,8 +265,9 @@ function renderStreakMetrics(candles) {
 }
 
 function renderStrategySimulation(candles) {
-  const threeRed = simulateStrategy(candles, 3);
-  const twoRed = simulateStrategy(candles, 2);
+  const threeRed = simulateStrategy(candles, 3, 3);
+  const twoRed = simulateStrategy(candles, 3, 2);
+  const twoGreen = simulateStrategy(candles, 2, 3);
   renderStrategyResult(threeRed, {
     summary: "strategySummary",
     endingValue: "strategyEndingValue",
@@ -276,10 +286,19 @@ function renderStrategySimulation(candles) {
     exits: "strategyTwoRedExits",
     position: "strategyTwoRedPosition"
   });
-  return { threeRed, twoRed };
+  renderStrategyResult(twoGreen, {
+    summary: "strategyTwoGreenSummary",
+    endingValue: "strategyTwoGreenEndingValue",
+    pnl: "strategyTwoGreenPnl",
+    entries: "strategyTwoGreenEntries",
+    contributed: "strategyTwoGreenContributed",
+    exits: "strategyTwoGreenExits",
+    position: "strategyTwoGreenPosition"
+  });
+  return { threeRed, twoRed, twoGreen };
 }
 
-function simulateStrategy(candles, sellAfterRedDays) {
+function simulateStrategy(candles, buyAfterGreenDays, sellAfterRedDays) {
   const contributionPerSignal = 1000;
   let cash = 0;
   let units = 0;
@@ -304,7 +323,7 @@ function simulateStrategy(candles, sellAfterRedDays) {
       redDays = 0;
     }
 
-    if (greenDays === 3) {
+    if (greenDays === buyAfterGreenDays) {
       totalContributed += contributionPerSignal;
       units += contributionPerSignal / close;
       entries++;
@@ -497,6 +516,7 @@ function drawPriceCandles(canvas, candles, hover = null, markers = null) {
       ctx.restore();
     };
     drawMarkerLines(markers.buys, "rgba(8,115,74,.55)");
+    drawMarkerLines(markers.buysTwoGreen, "rgba(18,166,106,.72)", [5, 4]);
     drawMarkerLines(markers.sellsTwoRed, "rgba(216,77,77,.50)");
     drawMarkerLines(markers.sellsThreeRed, "rgba(148,35,35,.72)", [5, 4]);
   }
