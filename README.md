@@ -16,6 +16,22 @@ $env:COINSPOT_API_KEY = "your-new-key"
 $env:COINSPOT_API_SECRET = "your-new-secret"
 ```
 
+The wallet chart uses a separate CoinSpot **Read Only** API key. Create a
+read-only key in CoinSpot and set it for the current terminal before starting
+the app:
+
+```powershell
+$env:COINSPOT_READ_ONLY_API_KEY = "your-read-only-key"
+$env:COINSPOT_READ_ONLY_API_SECRET = "your-read-only-secret"
+```
+
+Do not use a full-access key for the wallet chart. Wallet responses are marked
+`no-store`, and the browser never receives either credential.
+
+Alternatively, the empty `CoinSpot` section in `appsettings.json` can be filled
+for local use. Do not commit real values. Environment variables take precedence
+over values in the settings file.
+
 CoinSpot requires both values. The key identifies the account; the secret signs
 the exact JSON request body with HMAC-SHA512.
 
@@ -48,9 +64,9 @@ cancelled after execution. Start with very small amounts.
 
 CoinSpot's public API exposes current prices and only recent completed orders,
 not five years of OHLC candles. Five-year daily candles therefore come from the
-public Coinbase Exchange API in USD; hourly trend candles come from CoinGecko in
-the requested quote currency (AUD by default). Supported mappings are BTC, ETH,
-XRP, USDT, SOL, and USDC. Some assets may have less than five years of history
+public Coinbase Exchange API in USD; dashboard hourly and daily candles come from
+KuCoin USDT markets and are converted to AUD using CoinSpot's USDT price. Supported mappings
+for five-year Coinbase history are BTC, ETH, XRP, USDT, SOL, and USDC. Some assets may have less than five years of history
 because the asset or its Coinbase USD market is newer.
 
 `history` reports the low/high over the retrieved period, rolling 52-week

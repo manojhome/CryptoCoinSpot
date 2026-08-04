@@ -2,8 +2,14 @@ using CryptoTrader;
 using Microsoft.Extensions.Caching.Memory;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddUserSecrets<Program>(optional: true);
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<MarketDataClient>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("CryptoCoinSpot/2.0");
+});
+builder.Services.AddHttpClient(nameof(CoinSpotClient), client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("CryptoCoinSpot/2.0");
@@ -26,7 +32,6 @@ app.MapGet("/api/dashboard", async (
             return Results.BadRequest(new { error = "Investment amount must be between A$0.01 and A$100,000,000." });
 
         var hourly = await market.GetHourlyAsync(coin, 4, "aud", cancellationToken);
-        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         var daily = await market.GetRecentDailyAsync(coin, 365, "aud", cancellationToken);
         var signal = TrxStrategy.Evaluate(coin, daily);
         var trend = Analysis.CalculateTrend(coin, hourly);
@@ -98,7 +103,7 @@ app.MapGet("/api/gainers", async (
         return Results.Ok(new
         {
             period = "24h",
-            source = "CoinSpot-listed assets; change and reference price from CoinGecko",
+            source = "CoinSpot-listed assets; price and 24-hour change from KuCoin USDT markets",
             items = gainers ?? []
         });
     }
@@ -118,6 +123,39 @@ app.MapGet("/api/coinspot/price/{coin}", async (
         var client = new CoinSpotClient(factory.CreateClient(nameof(CoinSpotClient)), null, null);
         var price = await client.GetPriceAsync(coin, cancellationToken);
         return Results.Ok(new { coin = coin.ToUpperInvariant(), currency = "AUD", price });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
+app.MapGet("/api/coinspot/wallet", async (
+    HttpContext context,
+    IHttpClientFactory factory,
+    IConfiguration configuration,
+    CancellationToken cancellationToken) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    var apiKey = Environment.GetEnvironmentVariable("COINSPOT_READ_ONLY_API_KEY")
+                 ?? configuration["CoinSpot:ReadOnlyApiKey"];
+    var apiSecret = Environment.GetEnvironmentVariable("COINSPOT_READ_ONLY_API_SECRET")
+                    ?? configuration["CoinSpot:ReadOnlyApiSecret"];
+    if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
+        return Results.Problem(
+            "Configure the CoinSpot read-only API key and secret in environment variables or appsettings.json to display your wallet.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    try
+    {
+        var client = new CoinSpotClient(
+            factory.CreateClient(nameof(CoinSpotClient)), apiKey, apiSecret);
+        var holdings = await client.GetBalancesAsync(cancellationToken);
+        return Results.Ok(new
+        {
+            totalAud = holdings.Sum(x => x.AudBalance),
+            items = holdings,
+            refreshedAt = DateTimeOffset.UtcNow
+        });
     }
     catch (Exception ex)
     {

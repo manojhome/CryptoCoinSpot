@@ -9,6 +9,7 @@ namespace CryptoTrader;
 public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiSecret)
 {
     private const string ApiRoot = "https://www.coinspot.com.au/api/v2";
+    private const string ReadOnlyRoot = "https://www.coinspot.com.au/api/v2/ro";
     private const string PublicRoot = "https://www.coinspot.com.au/pubapi/v2";
     private static long _lastNonce;
 
@@ -34,6 +35,25 @@ public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiS
     public Task<JsonDocument> SellNowAsync(string coin, decimal amount, string amountType, CancellationToken ct) =>
         PostPrivateAsync("/my/sell/now", Fields(coin, amount, amountType), ct);
 
+    public async Task<IReadOnlyList<WalletHolding>> GetBalancesAsync(CancellationToken cancellationToken)
+    {
+        using var json = await PostAuthenticatedAsync(
+            ReadOnlyRoot, "/my/balances", new Dictionary<string, string>(), cancellationToken);
+        return json.RootElement.GetProperty("balances").EnumerateArray()
+            .SelectMany(item => item.EnumerateObject().Select(entry =>
+            {
+                var value = entry.Value;
+                return new WalletHolding(
+                    entry.Name.ToUpperInvariant(),
+                    ReadDecimal(value.GetProperty("balance")),
+                    ReadDecimal(value.GetProperty("audbalance")),
+                    ReadDecimal(value.GetProperty("rate")));
+            }))
+            .Where(x => x.Balance > 0 || x.AudBalance > 0)
+            .OrderByDescending(x => x.AudBalance)
+            .ToArray();
+    }
+
     private static Dictionary<string, string> Fields(string coin, decimal amount, string amountType)
     {
         amountType = amountType.ToLowerInvariant();
@@ -50,6 +70,13 @@ public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiS
     private async Task<JsonDocument> PostPrivateAsync(
         string path,
         Dictionary<string, string> fields,
+        CancellationToken cancellationToken) =>
+        await PostAuthenticatedAsync(ApiRoot, path, fields, cancellationToken);
+
+    private async Task<JsonDocument> PostAuthenticatedAsync(
+        string root,
+        string path,
+        Dictionary<string, string> fields,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
@@ -62,7 +89,7 @@ public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiS
             HMACSHA512.HashData(Encoding.UTF8.GetBytes(apiSecret), Encoding.UTF8.GetBytes(body)))
             .ToLowerInvariant();
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, ApiRoot + path);
+        using var request = new HttpRequestMessage(HttpMethod.Post, root + path);
         request.Headers.Add("key", apiKey);
         request.Headers.Add("sign", signature);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -71,6 +98,11 @@ public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiS
         using var response = await http.SendAsync(request, cancellationToken);
         return await ReadSuccessfulJsonAsync(response, cancellationToken);
     }
+
+    private static decimal ReadDecimal(JsonElement value) =>
+        value.ValueKind == JsonValueKind.String
+            ? decimal.Parse(value.GetString()!, CultureInfo.InvariantCulture)
+            : value.GetDecimal();
 
     private static long NextNonce()
     {

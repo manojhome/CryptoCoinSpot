@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 let snapshot = null;
 let gainersSnapshot = null;
+let walletSnapshot = null;
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
@@ -14,6 +15,7 @@ $("amount").addEventListener("keydown", e => { if (e.key === "Enter") analyse();
 window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
   if (gainersSnapshot) drawGainers(gainersSnapshot);
+  if (walletSnapshot) drawWallet(walletSnapshot);
 });
 
 async function analyse(isAutomatic = false) {
@@ -24,6 +26,9 @@ async function analyse(isAutomatic = false) {
   $("analyse").disabled = true;
   $("refreshState").textContent = "Updating";
   hideError();
+  $("dashboard").hidden = false;
+  if (gainersSnapshot) drawGainers(gainersSnapshot);
+  if (walletSnapshot) drawWallet(walletSnapshot);
   try {
     const response = await fetch(`/api/dashboard?coin=${encodeURIComponent(coin)}&amount=${encodeURIComponent(amount)}`);
     const data = await response.json();
@@ -35,10 +40,25 @@ async function analyse(isAutomatic = false) {
     if (!timer) timer = setInterval(tick, 1000);
   } catch (error) {
     showError(error.message);
+    clearMarketSections();
     $("refreshState").textContent = "Update failed";
   } finally {
     $("analyse").disabled = false;
   }
+}
+
+function clearMarketSections() {
+  snapshot = null;
+  for (const id of ["priceChart", "valueChart"]) {
+    const canvas = $(id);
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  $("priceRange").textContent = "Unavailable";
+  $("valueRange").textContent = "Unavailable";
+  $("dailyRows").innerHTML = "";
+  $("signal").textContent = "—";
+  $("explanation").textContent = "Market data is temporarily unavailable. Wallet and gainers can still refresh independently.";
 }
 
 function render(data) {
@@ -46,6 +66,8 @@ function render(data) {
   const currentValue = units * data.currentPrice;
   const change = (currentValue / data.amount - 1) * 100;
   $("dashboard").hidden = false;
+  if (gainersSnapshot) drawGainers(gainersSnapshot);
+  if (walletSnapshot) drawWallet(walletSnapshot);
   $("signal").textContent = data.signal.action;
   $("signal").className = `signal ${data.signal.action.startsWith("BUY") ? "buy" : ""}`;
   $("explanation").textContent = data.signal.explanation;
@@ -107,7 +129,7 @@ function drawCharts(data) {
   const prices = data.hourly.map(x => Number(x.price));
   const units = data.amount / entryPrice;
   const values = prices.map(x => x * units);
-  drawCandles($("priceChart"), data.hourly);
+  drawPriceBars($("priceChart"), data.hourly);
   drawLine($("valueChart"), values, "#10201b", "rgba(200,240,108,.26)");
   $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
   $("valueRange").textContent = `${aud(Math.min(...values), 2)} — ${aud(Math.max(...values), 2)}`;
@@ -123,6 +145,8 @@ async function loadGainers() {
     drawGainers(data.items);
     $("gainersStatus").textContent = `${data.items.length} assets · refreshed ${new Date().toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
   } catch (error) {
+    gainersSnapshot = [];
+    drawGainers([]);
     $("gainersStatus").textContent = `Unavailable: ${error.message}`;
   }
 }
@@ -163,7 +187,63 @@ function drawGainers(items) {
   });
 }
 
-function drawCandles(canvas, candles) {
+async function loadWallet() {
+  $("walletStatus").textContent = "Connecting…";
+  try {
+    const response = await fetch("/api/coinspot/wallet", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Wallet update failed.");
+    walletSnapshot = data.items;
+    drawWallet(data.items);
+    $("walletStatus").textContent = `${data.items.length} coins · ${aud(data.totalAud, 2)}`;
+  } catch (error) {
+    $("walletStatus").textContent = error.message.includes("COINSPOT_READ_ONLY")
+      ? "Read-only API not configured"
+      : `Unavailable: ${error.message}`;
+  }
+}
+
+function drawWallet(items) {
+  const canvas = $("walletChart");
+  const rowHeight = 34;
+  const cssHeight = Math.max(180, items.length * rowHeight + 28);
+  canvas.style.height = `${cssHeight}px`;
+  const width = canvas.clientWidth;
+  if (!width) return;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = width * ratio; canvas.height = cssHeight * ratio;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(ratio, ratio);
+  ctx.textBaseline = "middle";
+  const labelWidth = 82;
+  const valueWidth = 190;
+  const barWidth = Math.max(80, width - labelWidth - valueWidth - 18);
+  const maxValue = Math.max(1, ...items.map(x => Number(x.audBalance)));
+
+  items.forEach((item, index) => {
+    const y = 16 + index * rowHeight;
+    const value = Number(item.audBalance);
+    if (index % 2) {
+      ctx.fillStyle = "rgba(16,32,27,.025)";
+      ctx.fillRect(0, y - 16, width, rowHeight);
+    }
+    ctx.fillStyle = "#10201b";
+    ctx.textAlign = "left";
+    ctx.font = "700 11px ui-monospace, Consolas, monospace";
+    ctx.fillText(item.coin, 8, y);
+    ctx.fillStyle = "#12a66a";
+    ctx.fillRect(labelWidth, y - 8, Math.max(2, value / maxValue * barWidth), 16);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#10201b";
+    ctx.font = "700 11px ui-monospace, Consolas, monospace";
+    ctx.fillText(aud(value, 2), width - 4, y - 5);
+    ctx.fillStyle = "#64736e";
+    ctx.font = "10px ui-monospace, Consolas, monospace";
+    ctx.fillText(`${number(item.balance, 8)} coins`, width - 4, y + 8);
+  });
+}
+
+function drawPriceBars(canvas, candles) {
   const ratio = window.devicePixelRatio || 1;
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
@@ -174,12 +254,11 @@ function drawCandles(canvas, candles) {
   const left = 12, right = 8, top = 12, bottom = 32;
   const plotWidth = width - left - right;
   const plotHeight = height - top - bottom;
-  const lows = candles.map(x => Number(x.low));
-  const highs = candles.map(x => Number(x.high));
-  const min = Math.min(...lows), max = Math.max(...highs), range = max - min || 1;
+  const closes = candles.map(x => Number(x.close));
+  const min = Math.min(...closes), max = Math.max(...closes), range = max - min || 1;
   const y = value => top + (max - value) / range * plotHeight;
   const step = plotWidth / candles.length;
-  const bodyWidth = Math.max(2, Math.min(7, step * .68));
+  const barWidth = Math.max(2, Math.min(9, step * .72));
 
   ctx.strokeStyle = "#e4e9e2"; ctx.lineWidth = 1;
   for (let i = 0; i < 4; i++) {
@@ -189,14 +268,11 @@ function drawCandles(canvas, candles) {
 
   candles.forEach((candle, index) => {
     const open = Number(candle.open), close = Number(candle.close);
-    const high = Number(candle.high), low = Number(candle.low);
     const x = left + (index + .5) * step;
     const colour = close >= open ? "#12a66a" : "#d84d4d";
-    ctx.strokeStyle = colour; ctx.fillStyle = colour; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x, y(high)); ctx.lineTo(x, y(low)); ctx.stroke();
-    const bodyTop = y(Math.max(open, close));
-    const bodyHeight = Math.max(1.5, Math.abs(y(open) - y(close)));
-    ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+    const barTop = y(close);
+    ctx.fillStyle = colour;
+    ctx.fillRect(x - barWidth / 2, barTop, barWidth, Math.max(2, top + plotHeight - barTop));
   });
 
   ctx.fillStyle = "#64736e";
@@ -245,3 +321,4 @@ function escapeHtml(value) { const node = document.createElement("span"); node.t
 
 analyse();
 loadGainers();
+loadWallet();

@@ -35,15 +35,6 @@
     <div id="error" class="error" role="alert" hidden></div>
 
     <section id="dashboard" hidden>
-      <article class="gainers-card chart-card">
-        <div class="card-head">
-          <div><p class="label">COINSPOT-LISTED / 24 HOURS</p><h2>Top 50 gainers</h2></div>
-          <span id="gainersStatus">Loading ranking…</span>
-        </div>
-        <p class="data-note">CoinSpot supplies the listing universe. Percentage change and reference AUD price use the market-data feed because CoinSpot’s public latest-price API does not include 24-hour change.</p>
-        <div class="gainers-scroll"><canvas id="gainersChart" aria-label="Top 50 CoinSpot-listed gainers chart"></canvas></div>
-      </article>
-
       <div class="signal-strip">
         <div>
           <p class="label">Strategy signal</p>
@@ -62,7 +53,7 @@
       <div class="charts">
         <article class="chart-card">
           <div class="card-head"><div><p class="label">MARKET</p><h2>96-hour price</h2></div><span id="priceRange">—</span></div>
-          <canvas id="priceChart" aria-label="Hourly coin price chart"></canvas>
+          <canvas id="priceChart" aria-label="96-hour red and green price bar chart"></canvas>
         </article>
         <article class="chart-card">
           <div class="card-head"><div><p class="label">POSITION</p><h2>Paper investment value</h2></div><span id="valueRange">—</span></div>
@@ -101,6 +92,24 @@
           </div>
         </article>
       </div>
+
+      <article class="wallet-card chart-card">
+        <div class="card-head">
+          <div><p class="label">COINSPOT / READ ONLY</p><h2>My CoinSpot wallet</h2></div>
+          <span id="walletStatus">Connecting…</span>
+        </div>
+        <p class="data-note">Current CoinSpot wallet balances and AUD values. Read-only API credentials are required; no trading action is available here.</p>
+        <div class="wallet-scroll"><canvas id="walletChart" aria-label="My CoinSpot wallet holdings chart"></canvas></div>
+      </article>
+
+      <article class="gainers-card chart-card">
+        <div class="card-head">
+          <div><p class="label">COINSPOT-LISTED / 24 HOURS</p><h2>Top 50 gainers</h2></div>
+          <span id="gainersStatus">Loading ranking…</span>
+        </div>
+        <p class="data-note">CoinSpot supplies the listing universe. Percentage change and reference AUD price use matching KuCoin USDT markets because CoinSpot’s public latest-price API does not include 24-hour change.</p>
+        <div class="gainers-scroll"><canvas id="gainersChart" aria-label="Top 50 CoinSpot-listed gainers chart"></canvas></div>
+      </article>
     </section>
 
     <footer>This is a descriptive paper-trading tool, not financial advice. Market feeds can differ from executable CoinSpot prices.</footer>

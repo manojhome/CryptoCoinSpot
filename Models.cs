@@ -48,3 +48,9 @@ public sealed record MarketGainer(
     string Name,
     decimal PriceAud,
     decimal Change24HoursPercent);
+
+public sealed record WalletHolding(
+    string Coin,
+    decimal Balance,
+    decimal AudBalance,
+    decimal RateAud);
