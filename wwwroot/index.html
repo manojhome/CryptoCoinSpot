@@ -93,6 +93,20 @@
         </article>
       </div>
 
+      <article class="pullback-chart-card chart-card">
+        <div class="card-head">
+          <div><p class="label">STORED / 365 COMPLETED DAYS</p><h2>Pullback context</h2></div>
+          <span id="pullbackChartRange">—</span>
+        </div>
+        <div class="streak-metrics" aria-label="Consecutive daily candle statistics">
+          <div class="streak-green"><span>3+ green streaks</span><strong id="greenTripleRuns">—</strong><small>distinct runs</small></div>
+          <div class="streak-red"><span>3+ red streaks</span><strong id="redTripleRuns">—</strong><small>distinct runs</small></div>
+          <div class="streak-green"><span>Average green run</span><strong id="averageGreenRun">—</strong><small>consecutive days</small></div>
+          <div class="streak-red"><span>Average red run</span><strong id="averageRedRun">—</strong><small>consecutive days</small></div>
+        </div>
+        <canvas id="pullbackChart" aria-label="Interactive 365-day pullback context OHLC candlestick chart"></canvas>
+      </article>
+
       <div class="bottom-charts">
         <article class="gainers-card chart-card">
           <div class="card-head">

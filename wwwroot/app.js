@@ -3,6 +3,7 @@ let snapshot = null;
 let gainersSnapshot = null;
 let walletSnapshot = null;
 let priceHover = null;
+let pullbackHover = null;
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
@@ -32,6 +33,24 @@ $("priceChart").addEventListener("mousemove", event => {
 $("priceChart").addEventListener("mouseleave", () => {
   priceHover = null;
   if (snapshot) drawPriceCandles($("priceChart"), snapshot.hourly);
+});
+$("pullbackChart").addEventListener("mousemove", event => {
+  if (!snapshot?.daily?.length) return;
+  const canvas = $("pullbackChart");
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * canvas.clientWidth / rect.width;
+  const y = (event.clientY - rect.top) * canvas.clientHeight / rect.height;
+  const left = 82, right = 12, top = 14, bottom = 34;
+  const step = (canvas.clientWidth - left - right) / snapshot.daily.length;
+  const index = Math.floor((x - left) / step);
+  pullbackHover = index < 0 || index >= snapshot.daily.length || y < top || y > canvas.clientHeight - bottom
+    ? null
+    : { index, y };
+  drawPriceCandles(canvas, snapshot.daily, pullbackHover);
+});
+$("pullbackChart").addEventListener("mouseleave", () => {
+  pullbackHover = null;
+  if (snapshot) drawPriceCandles($("pullbackChart"), snapshot.daily);
 });
 window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
@@ -70,7 +89,7 @@ async function analyse(isAutomatic = false) {
 
 function clearMarketSections() {
   snapshot = null;
-  for (const id of ["priceChart", "valueChart"]) {
+  for (const id of ["priceChart", "valueChart", "pullbackChart"]) {
     const canvas = $(id);
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -78,6 +97,9 @@ function clearMarketSections() {
   $("priceRange").textContent = "Unavailable";
   $("valueRange").textContent = "Unavailable";
   $("dailyRows").innerHTML = "";
+  $("pullbackChartRange").textContent = "Unavailable";
+  for (const id of ["greenTripleRuns", "redTripleRuns", "averageGreenRun", "averageRedRun"])
+    $(id).textContent = "—";
   $("signal").textContent = "—";
   $("explanation").textContent = "Market data is temporarily unavailable. Wallet and gainers can still refresh independently.";
 }
@@ -157,9 +179,47 @@ function drawCharts(data) {
   const units = data.amount / entryPrice;
   const values = prices.map(x => x * units);
   drawPriceCandles($("priceChart"), data.hourly, priceHover);
+  drawPriceCandles($("pullbackChart"), data.daily, pullbackHover);
   drawLine($("valueChart"), values, "#10201b", "rgba(200,240,108,.26)");
   $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
   $("valueRange").textContent = `${aud(Math.min(...values), 2)} — ${aud(Math.max(...values), 2)}`;
+  const dailyLows = data.daily.map(x => Number(x.low));
+  const dailyHighs = data.daily.map(x => Number(x.high));
+  $("pullbackChartRange").textContent = `${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
+  renderStreakMetrics(data.daily);
+}
+
+function renderStreakMetrics(candles) {
+  const runs = { green: [], red: [] };
+  let direction = null;
+  let length = 0;
+  const finishRun = () => {
+    if (direction && length) runs[direction].push(length);
+    direction = null;
+    length = 0;
+  };
+
+  candles.forEach(candle => {
+    const open = Number(candle.open), close = Number(candle.close);
+    const nextDirection = close > open ? "green" : close < open ? "red" : null;
+    if (!nextDirection) return finishRun();
+    if (nextDirection === direction) {
+      length++;
+    } else {
+      finishRun();
+      direction = nextDirection;
+      length = 1;
+    }
+  });
+  finishRun();
+
+  const average = values => values.length
+    ? values.reduce((total, value) => total + value, 0) / values.length
+    : 0;
+  $("greenTripleRuns").textContent = runs.green.filter(value => value >= 3).length;
+  $("redTripleRuns").textContent = runs.red.filter(value => value >= 3).length;
+  $("averageGreenRun").textContent = average(runs.green).toFixed(2);
+  $("averageRedRun").textContent = average(runs.red).toFixed(2);
 }
 
 async function loadGainers() {
@@ -323,7 +383,7 @@ function drawPriceCandles(canvas, candles, hover = null) {
   ctx.font = "10px ui-monospace, Consolas, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
-  const labelEvery = width < 600 ? 24 : 12;
+  const labelEvery = Math.max(1, Math.ceil(candles.length / (width < 600 ? 5 : 9)));
   candles.forEach((candle, index) => {
     if (index % labelEvery !== 0 && index !== candles.length - 1) return;
     const time = new Date(candle.time);
