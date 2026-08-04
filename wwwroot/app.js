@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id);
 let snapshot = null;
 let gainersSnapshot = null;
 let walletSnapshot = null;
+let priceHover = null;
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
@@ -12,6 +13,26 @@ const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFra
 $("analyse").addEventListener("click", analyse);
 $("coin").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
 $("amount").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
+$("priceChart").addEventListener("mousemove", event => {
+  if (!snapshot?.hourly?.length) return;
+  const canvas = $("priceChart");
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * canvas.clientWidth / rect.width;
+  const y = (event.clientY - rect.top) * canvas.clientHeight / rect.height;
+  const left = 82, right = 12, top = 14, bottom = 34;
+  const step = (canvas.clientWidth - left - right) / snapshot.hourly.length;
+  const index = Math.floor((x - left) / step);
+  if (index < 0 || index >= snapshot.hourly.length || y < top || y > canvas.clientHeight - bottom) {
+    priceHover = null;
+  } else {
+    priceHover = { index, y };
+  }
+  drawPriceCandles(canvas, snapshot.hourly, priceHover);
+});
+$("priceChart").addEventListener("mouseleave", () => {
+  priceHover = null;
+  if (snapshot) drawPriceCandles($("priceChart"), snapshot.hourly);
+});
 window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
   if (gainersSnapshot) drawGainers(gainersSnapshot);
@@ -129,7 +150,7 @@ function drawCharts(data) {
   const prices = data.hourly.map(x => Number(x.price));
   const units = data.amount / entryPrice;
   const values = prices.map(x => x * units);
-  drawPriceBars($("priceChart"), data.hourly);
+  drawPriceCandles($("priceChart"), data.hourly, priceHover);
   drawLine($("valueChart"), values, "#10201b", "rgba(200,240,108,.26)");
   $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
   $("valueRange").textContent = `${aud(Math.min(...values), 2)} — ${aud(Math.max(...values), 2)}`;
@@ -243,7 +264,7 @@ function drawWallet(items) {
   });
 }
 
-function drawPriceBars(canvas, candles) {
+function drawPriceCandles(canvas, candles, hover = null) {
   const ratio = window.devicePixelRatio || 1;
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
@@ -251,28 +272,45 @@ function drawPriceBars(canvas, candles) {
   const ctx = canvas.getContext("2d");
   ctx.scale(ratio, ratio);
 
-  const left = 12, right = 8, top = 12, bottom = 32;
+  const left = 82, right = 12, top = 14, bottom = 34;
   const plotWidth = width - left - right;
   const plotHeight = height - top - bottom;
-  const closes = candles.map(x => Number(x.close));
-  const min = Math.min(...closes), max = Math.max(...closes), range = max - min || 1;
+  const lows = candles.map(x => Number(x.low));
+  const highs = candles.map(x => Number(x.high));
+  const rawMin = Math.min(...lows), rawMax = Math.max(...highs);
+  const rawRange = rawMax - rawMin || Math.max(rawMax * .01, .000001);
+  const min = rawMin - rawRange * .04, max = rawMax + rawRange * .04;
+  const range = max - min;
   const y = value => top + (max - value) / range * plotHeight;
   const step = plotWidth / candles.length;
-  const barWidth = Math.max(2, Math.min(9, step * .72));
+  const bodyWidth = Math.max(2, Math.min(8, step * .7));
+  const priceDigits = max < 1 ? 6 : max < 100 ? 4 : 2;
 
-  ctx.strokeStyle = "#e4e9e2"; ctx.lineWidth = 1;
-  for (let i = 0; i < 4; i++) {
-    const gridY = top + i * plotHeight / 3;
+  ctx.font = "10px ui-monospace, Consolas, monospace";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i < 5; i++) {
+    const gridY = top + i * plotHeight / 4;
+    const gridPrice = max - i * range / 4;
+    ctx.strokeStyle = "#e4e9e2";
+    ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(left, gridY); ctx.lineTo(width - right, gridY); ctx.stroke();
+    ctx.fillStyle = "#64736e";
+    ctx.textAlign = "right";
+    ctx.fillText(aud(gridPrice, priceDigits), left - 8, gridY);
   }
 
   candles.forEach((candle, index) => {
     const open = Number(candle.open), close = Number(candle.close);
+    const high = Number(candle.high), low = Number(candle.low);
     const x = left + (index + .5) * step;
     const colour = close >= open ? "#12a66a" : "#d84d4d";
-    const barTop = y(close);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y(high)); ctx.lineTo(x, y(low)); ctx.stroke();
+    const bodyTop = y(Math.max(open, close));
+    const bodyHeight = Math.max(1.5, Math.abs(y(open) - y(close)));
     ctx.fillStyle = colour;
-    ctx.fillRect(x - barWidth / 2, barTop, barWidth, Math.max(2, top + plotHeight - barTop));
+    ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
   });
 
   ctx.fillStyle = "#64736e";
@@ -285,8 +323,45 @@ function drawPriceBars(canvas, candles) {
     const time = new Date(candle.time);
     const label = `${time.toLocaleDateString("en-AU", { day: "2-digit", month: "short" })} ${time.toLocaleTimeString("en-AU", { hour: "2-digit", hour12: false })}`;
     const x = left + (index + .5) * step;
-    ctx.fillText(label, Math.max(34, Math.min(width - 34, x)), height - 3);
+    ctx.fillText(label, Math.max(left + 34, Math.min(width - 34, x)), height - 3);
   });
+
+  if (hover) {
+    const candle = candles[hover.index];
+    const hoverY = Math.max(top, Math.min(top + plotHeight, hover.y));
+    const hoverPrice = max - (hoverY - top) / plotHeight * range;
+    const candleX = left + (hover.index + .5) * step;
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = "rgba(16,32,27,.65)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(left, hoverY); ctx.lineTo(width - right, hoverY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(candleX, top); ctx.lineTo(candleX, top + plotHeight); ctx.stroke();
+    ctx.restore();
+
+    const priceLabel = aud(hoverPrice, priceDigits);
+    ctx.font = "700 10px ui-monospace, Consolas, monospace";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#10201b";
+    ctx.fillRect(0, hoverY - 10, left - 5, 20);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(priceLabel, left - 10, hoverY);
+
+    const time = new Date(candle.time).toLocaleString("en-AU", {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false
+    });
+    const details = `${time}  O ${aud(candle.open, priceDigits)}  H ${aud(candle.high, priceDigits)}  L ${aud(candle.low, priceDigits)}  C ${aud(candle.close, priceDigits)}`;
+    ctx.font = "700 10px ui-monospace, Consolas, monospace";
+    const tooltipWidth = Math.min(plotWidth, ctx.measureText(details).width + 18);
+    const tooltipX = Math.max(left, Math.min(width - right - tooltipWidth, candleX - tooltipWidth / 2));
+    ctx.fillStyle = "rgba(16,32,27,.94)";
+    ctx.fillRect(tooltipX, top, tooltipWidth, 24);
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(details, tooltipX + 9, top + 12, tooltipWidth - 18);
+  }
 }
 
 function drawLine(canvas, values, stroke, fill) {
