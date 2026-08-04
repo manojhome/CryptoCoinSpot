@@ -4,6 +4,7 @@ let gainersSnapshot = null;
 let walletSnapshot = null;
 let priceHover = null;
 let pullbackHover = null;
+let pullbackMarkers = null;
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
@@ -46,11 +47,11 @@ $("pullbackChart").addEventListener("mousemove", event => {
   pullbackHover = index < 0 || index >= snapshot.daily.length || y < top || y > canvas.clientHeight - bottom
     ? null
     : { index, y };
-  drawPriceCandles(canvas, snapshot.daily, pullbackHover);
+  drawPriceCandles(canvas, snapshot.daily, pullbackHover, pullbackMarkers);
 });
 $("pullbackChart").addEventListener("mouseleave", () => {
   pullbackHover = null;
-  if (snapshot) drawPriceCandles($("pullbackChart"), snapshot.daily);
+  if (snapshot) drawPriceCandles($("pullbackChart"), snapshot.daily, null, pullbackMarkers);
 });
 window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
@@ -89,6 +90,7 @@ async function analyse(isAutomatic = false) {
 
 function clearMarketSections() {
   snapshot = null;
+  pullbackMarkers = null;
   for (const id of ["priceChart", "valueChart", "pullbackChart"]) {
     const canvas = $(id);
     const ctx = canvas.getContext("2d");
@@ -191,7 +193,6 @@ function drawCharts(data) {
   const units = data.amount / entryPrice;
   const values = prices.map(x => x * units);
   drawPriceCandles($("priceChart"), data.hourly, priceHover);
-  drawPriceCandles($("pullbackChart"), data.daily, pullbackHover);
   drawLine($("valueChart"), values, "#10201b", "rgba(200,240,108,.26)");
   $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
   $("valueRange").textContent = `${aud(Math.min(...values), 2)} — ${aud(Math.max(...values), 2)}`;
@@ -199,7 +200,13 @@ function drawCharts(data) {
   const dailyHighs = data.daily.map(x => Number(x.high));
   $("pullbackChartRange").textContent = `${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
   renderStreakMetrics(data.daily);
-  renderStrategySimulation(data.daily);
+  const simulations = renderStrategySimulation(data.daily);
+  pullbackMarkers = {
+    buys: simulations.threeRed.buyIndexes,
+    sellsTwoRed: simulations.twoRed.sellIndexes,
+    sellsThreeRed: simulations.threeRed.sellIndexes
+  };
+  drawPriceCandles($("pullbackChart"), data.daily, pullbackHover, pullbackMarkers);
 }
 
 function renderStreakMetrics(candles) {
@@ -236,7 +243,9 @@ function renderStreakMetrics(candles) {
 }
 
 function renderStrategySimulation(candles) {
-  renderStrategyResult(simulateStrategy(candles, 3), {
+  const threeRed = simulateStrategy(candles, 3);
+  const twoRed = simulateStrategy(candles, 2);
+  renderStrategyResult(threeRed, {
     summary: "strategySummary",
     endingValue: "strategyEndingValue",
     pnl: "strategyPnl",
@@ -245,7 +254,7 @@ function renderStrategySimulation(candles) {
     exits: "strategyExits",
     position: "strategyPosition"
   });
-  renderStrategyResult(simulateStrategy(candles, 2), {
+  renderStrategyResult(twoRed, {
     summary: "strategyTwoRedSummary",
     endingValue: "strategyTwoRedEndingValue",
     pnl: "strategyTwoRedPnl",
@@ -254,6 +263,7 @@ function renderStrategySimulation(candles) {
     exits: "strategyTwoRedExits",
     position: "strategyTwoRedPosition"
   });
+  return { threeRed, twoRed };
 }
 
 function simulateStrategy(candles, sellAfterRedDays) {
@@ -265,8 +275,10 @@ function simulateStrategy(candles, sellAfterRedDays) {
   let redDays = 0;
   let entries = 0;
   let exits = 0;
+  const buyIndexes = [];
+  const sellIndexes = [];
 
-  candles.forEach(candle => {
+  candles.forEach((candle, index) => {
     const open = Number(candle.open), close = Number(candle.close);
     if (close > open) {
       greenDays++;
@@ -283,10 +295,12 @@ function simulateStrategy(candles, sellAfterRedDays) {
       totalContributed += contributionPerSignal;
       units += contributionPerSignal / close;
       entries++;
+      buyIndexes.push(index);
     } else if (units && redDays === sellAfterRedDays) {
       cash += units * close;
       units = 0;
       exits++;
+      sellIndexes.push(index);
     }
   });
 
@@ -294,7 +308,10 @@ function simulateStrategy(candles, sellAfterRedDays) {
   const endingValue = cash + units * latestClose;
   const profit = endingValue - totalContributed;
   const profitPercent = totalContributed ? profit / totalContributed * 100 : 0;
-  return { endingValue, profit, profitPercent, entries, exits, totalContributed, invested: Boolean(units) };
+  return {
+    endingValue, profit, profitPercent, entries, exits, totalContributed,
+    invested: Boolean(units), buyIndexes, sellIndexes
+  };
 }
 
 function renderStrategyResult(result, ids) {
@@ -416,7 +433,7 @@ function drawWallet(items) {
   });
 }
 
-function drawPriceCandles(canvas, candles, hover = null) {
+function drawPriceCandles(canvas, candles, hover = null, markers = null) {
   const ratio = window.devicePixelRatio || 1;
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
@@ -449,6 +466,23 @@ function drawPriceCandles(canvas, candles, hover = null) {
     ctx.fillStyle = "#64736e";
     ctx.textAlign = "right";
     ctx.fillText(aud(gridPrice, priceDigits), left - 8, gridY);
+  }
+
+  if (markers) {
+    const drawMarkerLines = (indexes, colour, dash = []) => {
+      ctx.save();
+      ctx.strokeStyle = colour;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(dash);
+      indexes.forEach(index => {
+        const x = left + (index + .5) * step;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + plotHeight); ctx.stroke();
+      });
+      ctx.restore();
+    };
+    drawMarkerLines(markers.buys, "rgba(8,115,74,.55)");
+    drawMarkerLines(markers.sellsTwoRed, "rgba(216,77,77,.50)");
+    drawMarkerLines(markers.sellsThreeRed, "rgba(148,35,35,.72)", [5, 4]);
   }
 
   candles.forEach((candle, index) => {
