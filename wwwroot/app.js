@@ -101,6 +101,18 @@ $("pullbackChart").addEventListener("mouseleave", () => {
   pullbackHover = null;
   if (pullbackCandles.length) drawPriceCandles($("pullbackChart"), pullbackCandles, null, pullbackMarkers);
 });
+$("gainersChart").addEventListener("click", event => {
+  if (!gainersSnapshot?.length || $("analyse").disabled) return;
+  const canvas = $("gainersChart");
+  const rect = canvas.getBoundingClientRect();
+  const y = (event.clientY - rect.top) * canvas.clientHeight / rect.height;
+  const rowIndex = Math.floor(y / 29);
+  const selectedCoin = gainersSnapshot[rowIndex];
+  if (!selectedCoin) return;
+  $("coin").value = selectedCoin.coin;
+  document.querySelector(".control-panel").scrollIntoView({ behavior: "smooth", block: "center" });
+  analyse();
+});
 window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
   if (gainersSnapshot) drawGainers(gainersSnapshot);
