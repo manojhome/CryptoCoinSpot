@@ -365,7 +365,7 @@ async function loadAllTimeHistory() {
   hideError();
   try {
     const response = await fetch(`/api/history/${encodeURIComponent(snapshot.coin)}`);
-    const data = await response.json();
+    const data = await readApiJson(response, "AllTime history");
     if (!response.ok) throw new Error(data.error || data.detail || "AllTime history update failed.");
     snapshot.daily = data.daily;
     drawPullbackAnalysis(snapshot.daily);
@@ -948,6 +948,17 @@ function tick() {
 }
 function showError(message) { $("error").textContent = message; $("error").hidden = false; }
 function hideError() { $("error").hidden = true; }
+async function readApiJson(response, operation) {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    const receivedHtml = text.trimStart().startsWith("<");
+    throw new Error(receivedHtml
+      ? `${operation} received the app page instead of API data. Restart the updated app and try again.`
+      : `${operation} returned an invalid response.`);
+  }
+}
 function escapeHtml(value) { const node = document.createElement("span"); node.textContent = value; return node.innerHTML; }
 
 analyse();

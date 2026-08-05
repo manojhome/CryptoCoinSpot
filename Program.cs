@@ -228,5 +228,9 @@ app.MapGet("/api/coinspot/wallet", async (
     }
 });
 
+app.Map("/api/{**path}", () => Results.NotFound(new
+{
+    error = "The requested API endpoint is unavailable. Restart the app after updating it and try again."
+}));
 app.MapFallbackToFile("index.html");
 app.Run();
