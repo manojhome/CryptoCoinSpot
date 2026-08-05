@@ -79,6 +79,22 @@ button span { margin-left: 18px; }
 .trade-result { display: block; min-height: 38px; margin-top: 12px; color: var(--muted); font: 650 11px/1.5 ui-monospace, Consolas, monospace; }
 .trade-result.success { color: var(--green-dark); }
 .trade-result.failure { color: var(--red); }
+.live-transactions-card { margin-top: 14px; }
+.transaction-summaries { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 9px; margin: 12px 0; }
+.transaction-summary { padding: 12px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.transaction-summary > strong, .transaction-summary > span { display: block; }
+.transaction-summary > strong { font: 850 16px/1.2 ui-monospace, Consolas, monospace; }
+.transaction-summary > span { margin-top: 5px; color: var(--muted); font-size: 10px; }
+.transaction-summary.profit > strong { color: var(--green-dark); }
+.transaction-summary.loss > strong { color: var(--red); }
+.transaction-table-wrap { max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
+.transaction-table { min-width: 820px; margin-top: 0; }
+.transaction-side { display: inline-block; min-width: 42px; padding: 4px 6px; border-radius: 999px; color: white; text-align: center; font-size: 9px; font-weight: 850; }
+.transaction-side.buy { background: var(--green); }
+.transaction-side.sell { background: var(--red); }
+.transaction-pnl.profit { color: var(--green-dark); font-weight: 850; }
+.transaction-pnl.loss { color: var(--red); font-weight: 850; }
+.transaction-pnl small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; }
 
 .signal-strip { margin-top: 22px; padding: 24px 28px; display: grid; grid-template-columns: 210px 1fr; align-items: center; gap: 26px; background: var(--card); border: 1px solid var(--line); border-left: 7px solid var(--amber); border-radius: 14px; }
 .signal { margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -.03em; }
@@ -193,6 +209,7 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .control-panel button { grid-column: 1 / -1; }
   .bottom-charts { grid-template-columns: 1fr; }
   .live-trade-grid { grid-template-columns: 1fr; }
+  .transaction-summaries { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .streak-metrics { grid-template-columns: repeat(3, 1fr); }
   .strategy-summaries { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metrics { grid-template-columns: 1fr 1fr; }
@@ -210,6 +227,7 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .pullback-chart-card .card-head { flex-direction: column; }
   .live-trade-heading { flex-direction: column; }
   .trade-actions { grid-template-columns: 1fr; }
+  .transaction-summaries { grid-template-columns: 1fr; }
   .pullback-controls { justify-items: start; }
   .pullback-period-row { justify-content: flex-start; }
 }

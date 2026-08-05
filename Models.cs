@@ -70,3 +70,14 @@ public sealed record CoinSpotTradeQuote(
     string AmountType,
     decimal Rate,
     DateTimeOffset ExpiresAt);
+
+public sealed record LiveTradeTransaction(
+    string Id,
+    DateTimeOffset ExecutedAt,
+    string Side,
+    string Coin,
+    string Market,
+    decimal CoinAmount,
+    decimal TotalAud,
+    decimal ExecutionRate,
+    decimal QuotedRate);

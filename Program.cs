@@ -6,6 +6,8 @@ builder.Configuration.AddUserSecrets<Program>(optional: true);
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton(new DailyPriceStore(
     Path.Combine(builder.Environment.ContentRootPath, "Data")));
+builder.Services.AddSingleton(new TradeTransactionStore(
+    Path.Combine(builder.Environment.ContentRootPath, "Data")));
 builder.Services.AddHttpClient<MarketDataClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
@@ -323,6 +325,7 @@ app.MapPost("/api/coinspot/trading/{side}/execute", async (
     IHttpClientFactory factory,
     IConfiguration configuration,
     IMemoryCache cache,
+    TradeTransactionStore tradeTransactions,
     CancellationToken cancellationToken) =>
 {
     context.Response.Headers.CacheControl = "no-store";
@@ -364,17 +367,77 @@ app.MapPost("/api/coinspot/trading/{side}/execute", async (
             ? await client.BuyNowAsync(coin, request.Amount, amountType, quote.Rate, 1m, cancellationToken)
             : await client.SellNowAsync(coin, request.Amount, amountType, quote.Rate, 1m, cancellationToken);
 
+        var orderRoot = orderJson.RootElement;
+        var coinAmount = ReadOptionalJsonDecimal(orderRoot, "amount")
+            ?? (amountType == "coin" ? request.Amount : request.Amount / quote.Rate);
+        var totalAud = ReadOptionalJsonDecimal(orderRoot, "total")
+            ?? (amountType == "aud" ? request.Amount : coinAmount * quote.Rate);
+        var executionRate = ReadOptionalJsonDecimal(orderRoot, "rate")
+            ?? (coinAmount > 0 ? totalAud / coinAmount : quote.Rate);
+        var market = orderRoot.TryGetProperty("market", out var marketElement)
+            ? marketElement.GetString() ?? $"{coin}/AUD"
+            : $"{coin}/AUD";
+        var orderId = orderRoot.TryGetProperty("id", out var idElement)
+            ? idElement.ToString()
+            : Guid.NewGuid().ToString("N");
+        var transaction = new LiveTradeTransaction(
+            orderId,
+            DateTimeOffset.UtcNow,
+            side,
+            coin,
+            market,
+            coinAmount,
+            totalAud,
+            executionRate,
+            quote.Rate);
+        var transactionRecorded = true;
+        string? persistenceWarning = null;
+        try
+        {
+            // Persist independently of the disconnected request after CoinSpot confirms execution.
+            await tradeTransactions.AddAsync(transaction, CancellationToken.None);
+        }
+        catch (Exception persistenceException)
+        {
+            transactionRecorded = false;
+            persistenceWarning =
+                $"The CoinSpot order succeeded, but the local transaction file could not be updated: {persistenceException.Message}";
+        }
+
         return Results.Ok(new
         {
             side,
             coin,
             order = orderJson.RootElement.Clone(),
-            executedAt = DateTimeOffset.UtcNow
+            executedAt = transaction.ExecutedAt,
+            transactionRecorded,
+            persistenceWarning
         });
     }
     catch (ArgumentException ex)
     {
         return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
+app.MapGet("/api/coinspot/trading/transactions", async (
+    HttpContext context,
+    TradeTransactionStore tradeTransactions,
+    CancellationToken cancellationToken) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    try
+    {
+        var transactions = await tradeTransactions.GetAsync(cancellationToken);
+        return Results.Ok(new
+        {
+            file = "Data/live-trades.json",
+            items = transactions.OrderByDescending(x => x.ExecutedAt)
+        });
     }
     catch (Exception ex)
     {
@@ -405,3 +468,11 @@ static decimal ReadJsonDecimal(System.Text.Json.JsonElement value) =>
     value.ValueKind == System.Text.Json.JsonValueKind.String
         ? decimal.Parse(value.GetString()!, System.Globalization.CultureInfo.InvariantCulture)
         : value.GetDecimal();
+
+static decimal? ReadOptionalJsonDecimal(System.Text.Json.JsonElement root, string propertyName)
+{
+    if (!root.TryGetProperty(propertyName, out var value) ||
+        value.ValueKind is System.Text.Json.JsonValueKind.Null or System.Text.Json.JsonValueKind.Undefined)
+        return null;
+    return ReadJsonDecimal(value);
+}

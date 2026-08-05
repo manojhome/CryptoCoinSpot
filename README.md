@@ -105,3 +105,11 @@ Each requested ticker gets its own file. Pullback context uses the latest 365
 stored entries, and can fall back to the local file when the daily provider is
 temporarily unavailable. Generated JSON history files are local runtime data and
 are excluded from Git; `Data/.gitkeep` preserves the directory in the repository.
+
+## Stored live transactions
+
+Every successful live Buy, Sell, or AutoSell submitted by this app is appended
+to `Data/live-trades.json`. The transaction container uses weighted-average cost
+for realized sell P/L and the current wallet rate for unrealized P/L. Sells made
+against coins acquired outside this app show `N/A` until a recorded buy cost is
+available. The ledger is local runtime data and is excluded from Git.

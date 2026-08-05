@@ -287,6 +287,21 @@
 
     </section>
 
+    <article class="chart-card live-transactions-card" aria-labelledby="liveTransactionsHeading">
+      <div class="card-head">
+        <div><p class="label">PERMANENT DATA / LIVE ORDERS</p><h2 id="liveTransactionsHeading">My buy and sell transactions</h2></div>
+        <span id="liveTransactionsStatus">Loading transactions…</span>
+      </div>
+      <p class="data-note">Stored permanently in Data/live-trades.json. Sell P/L uses weighted-average recorded buy cost. Buy P/L compares its execution rate with the current CoinSpot wallet rate.</p>
+      <div id="liveTransactionSummaries" class="transaction-summaries"></div>
+      <div class="transaction-table-wrap">
+        <table class="transaction-table">
+          <thead><tr><th>Date / time</th><th>Coin</th><th>Side</th><th>Coin amount</th><th>AUD total</th><th>Execution rate</th><th>Profit / loss</th></tr></thead>
+          <tbody id="liveTransactionsBody"><tr><td colspan="7">No transactions recorded yet.</td></tr></tbody>
+        </table>
+      </div>
+    </article>
+
     <footer>This is not financial advice. Live trading uses real funds, and market feeds can differ from executable CoinSpot prices.</footer>
   </main>
   <script src="/app.js"></script>

@@ -17,6 +17,7 @@ let timer = null;
 let liveTradingStatus = { configured: false, enabled: false, ready: false };
 const liveTradeQuotes = { buy: null, sell: null };
 let liveSellAmountType = "coin";
+let liveTransactionsSnapshot = [];
 
 const aud = (n, digits = 4) => `$${Number(n).toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFractionDigits: digits });
@@ -221,9 +222,10 @@ async function executeLiveTrade(side, skipConfirmation = false) {
     if (!response.ok) throw new Error(data.error || data.detail || `${side} execution failed.`);
     const order = data.order || {};
     result.className = "trade-result success";
-    result.textContent = `LIVE ${action} completed · ${number(order.amount ?? quote.amount, 8)} ${quote.coin} · total ${aud(order.total ?? 0, 2)}.`;
+    result.textContent = `LIVE ${action} completed · ${number(order.amount ?? quote.amount, 8)} ${quote.coin} · total ${aud(order.total ?? 0, 2)}.` +
+      (data.persistenceWarning ? ` WARNING: ${data.persistenceWarning}` : "");
     liveTradeQuotes[side] = null;
-    await loadWallet();
+    await Promise.all([loadWallet(), loadLiveTransactions()]);
   } catch (error) {
     liveTradeQuotes[side] = null;
     showTradeFailure(result, error.message);
@@ -247,6 +249,124 @@ async function autoSellNow() {
 function showTradeFailure(element, message) {
   element.className = "trade-result failure";
   element.textContent = message;
+}
+
+async function loadLiveTransactions() {
+  const status = $("liveTransactionsStatus");
+  try {
+    const response = await fetch("/api/coinspot/trading/transactions", { cache: "no-store" });
+    const data = await readApiJson(response, "Live transactions");
+    if (!response.ok) throw new Error(data.error || data.detail || "Transaction history failed.");
+    liveTransactionsSnapshot = data.items || [];
+    drawLiveTransactions();
+    status.textContent = `${liveTransactionsSnapshot.length} transactions · Data/live-trades.json`;
+  } catch (error) {
+    liveTransactionsSnapshot = [];
+    drawLiveTransactions();
+    status.textContent = `Unavailable: ${error.message}`;
+  }
+}
+
+function drawLiveTransactions() {
+  const body = $("liveTransactionsBody");
+  const summaries = $("liveTransactionSummaries");
+  body.replaceChildren();
+  summaries.replaceChildren();
+  if (!liveTransactionsSnapshot.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 7;
+    cell.textContent = "No live transactions recorded through this app yet.";
+    row.appendChild(cell); body.appendChild(row);
+    return;
+  }
+
+  const currentRates = new Map((walletSnapshot || []).map(item => [item.coin, Number(item.rateAud)]));
+  const states = new Map();
+  const rowPnl = new Map();
+  const chronological = [...liveTransactionsSnapshot].sort(
+    (left, right) => new Date(left.executedAt) - new Date(right.executedAt));
+
+  chronological.forEach((transaction, index) => {
+    const coin = transaction.coin;
+    const state = states.get(coin) || { quantity: 0, cost: 0, realized: 0, matchedSells: 0, unmatchedSells: 0 };
+    const coinAmount = Number(transaction.coinAmount);
+    const totalAud = Number(transaction.totalAud);
+    if (transaction.side === "buy") {
+      state.quantity += coinAmount;
+      state.cost += totalAud;
+      const currentRate = currentRates.get(coin);
+      rowPnl.set(index, Number.isFinite(currentRate)
+        ? { value: (currentRate - Number(transaction.executionRate)) * coinAmount, label: "vs current rate" }
+        : null);
+    } else {
+      const matched = Math.min(Math.max(state.quantity, 0), coinAmount);
+      if (matched > 0 && state.quantity > 0) {
+        const averageCost = state.cost / state.quantity;
+        const matchedProceeds = totalAud * (matched / coinAmount);
+        const realized = matchedProceeds - averageCost * matched;
+        state.realized += realized;
+        state.matchedSells += 1;
+        state.quantity -= matched;
+        state.cost = Math.max(0, state.cost - averageCost * matched);
+        rowPnl.set(index, { value: realized, label: matched < coinAmount ? "partial realized" : "realized" });
+      } else {
+        state.unmatchedSells += 1;
+        rowPnl.set(index, null);
+      }
+    }
+    states.set(coin, state);
+  });
+
+  [...states.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([coin, state]) => {
+    const currentRate = currentRates.get(coin);
+    const hasUnrealized = state.quantity <= 0 || Number.isFinite(currentRate);
+    const unrealized = state.quantity > 0 && Number.isFinite(currentRate)
+      ? state.quantity * currentRate - state.cost
+      : 0;
+    const total = hasUnrealized ? state.realized + unrealized : null;
+    const card = document.createElement("div");
+    card.className = `transaction-summary ${total == null ? "" : total >= 0 ? "profit" : "loss"}`;
+    const heading = document.createElement("strong");
+    heading.textContent = `${coin} ${total == null ? "P/L unavailable" : formatPnl(total)}`;
+    const detail = document.createElement("span");
+    detail.textContent = `Realized ${formatPnl(state.realized)} · Unrealized ${hasUnrealized ? formatPnl(unrealized) : "N/A"}` +
+      (state.unmatchedSells ? ` · ${state.unmatchedSells} sell(s) lack recorded buy cost` : "");
+    card.append(heading, detail); summaries.appendChild(card);
+  });
+
+  const pnlByTransaction = new Map();
+  chronological.forEach((transaction, index) => pnlByTransaction.set(transaction, rowPnl.get(index)));
+  [...liveTransactionsSnapshot].sort(
+    (left, right) => new Date(right.executedAt) - new Date(left.executedAt)).forEach(transaction => {
+      const row = document.createElement("tr");
+      appendTransactionCell(row, new Date(transaction.executedAt).toLocaleString("en-AU"));
+      appendTransactionCell(row, transaction.coin);
+      const sideCell = document.createElement("td");
+      const side = document.createElement("span");
+      side.className = `transaction-side ${transaction.side}`;
+      side.textContent = transaction.side.toUpperCase();
+      sideCell.appendChild(side); row.appendChild(sideCell);
+      appendTransactionCell(row, number(transaction.coinAmount, 8));
+      appendTransactionCell(row, aud(transaction.totalAud, 2));
+      appendTransactionCell(row, aud(transaction.executionRate, Number(transaction.executionRate) < 1 ? 8 : 2));
+      const pnlCell = document.createElement("td");
+      const pnl = pnlByTransaction.get(transaction);
+      pnlCell.className = `transaction-pnl ${pnl == null ? "" : pnl.value >= 0 ? "profit" : "loss"}`;
+      pnlCell.textContent = pnl == null ? "N/A" : formatPnl(pnl.value);
+      if (pnl) {
+        const note = document.createElement("small"); note.textContent = pnl.label; pnlCell.appendChild(note);
+      }
+      row.appendChild(pnlCell); body.appendChild(row);
+    });
+}
+
+function appendTransactionCell(row, value) {
+  const cell = document.createElement("td"); cell.textContent = value; row.appendChild(cell);
+}
+
+function formatPnl(value) {
+  return `${value >= 0 ? "+" : "−"}${aud(Math.abs(value), 2)}`;
 }
 $("priceChart").addEventListener("mousemove", event => {
   if (!snapshot?.hourly?.length) return;
@@ -930,10 +1050,12 @@ async function loadWallet() {
     walletSnapshot = data.items;
     drawWallet(data.items);
     updateSellWalletSummary();
+    drawLiveTransactions();
     $("walletStatus").textContent = `${data.items.length} coins · ${aud(data.totalAud, 2)}`;
   } catch (error) {
     walletSnapshot = null;
     updateSellWalletSummary();
+    drawLiveTransactions();
     $("walletStatus").textContent = error.message.includes("COINSPOT_READ_ONLY")
       ? "Read-only API not configured"
       : `Unavailable: ${error.message}`;
@@ -1195,3 +1317,4 @@ loadGainers();
 loadWallet();
 syncLiveTradeCoin();
 loadLiveTradingStatus();
+loadLiveTransactions();
