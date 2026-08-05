@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 let snapshot = null;
 let gainersSnapshot = null;
+let selectedGainerCoin = null;
 let walletSnapshot = null;
 let priceHover = null;
 let dailyPercentHover = null;
@@ -101,7 +102,7 @@ $("pullbackChart").addEventListener("mouseleave", () => {
   pullbackHover = null;
   if (pullbackCandles.length) drawPriceCandles($("pullbackChart"), pullbackCandles, null, pullbackMarkers);
 });
-$("gainersChart").addEventListener("click", event => {
+$("gainersChart").addEventListener("click", async event => {
   if (!gainersSnapshot?.length || $("analyse").disabled) return;
   const canvas = $("gainersChart");
   const rect = canvas.getBoundingClientRect();
@@ -109,9 +110,13 @@ $("gainersChart").addEventListener("click", event => {
   const rowIndex = Math.floor(y / 29);
   const selectedCoin = gainersSnapshot[rowIndex];
   if (!selectedCoin) return;
+  selectedGainerCoin = selectedCoin.coin;
+  drawGainers(gainersSnapshot);
   $("coin").value = selectedCoin.coin;
-  document.querySelector(".control-panel").scrollIntoView({ behavior: "smooth", block: "center" });
-  analyse();
+  await analyse();
+  const timeline = $("timelineData");
+  timeline.scrollIntoView({ behavior: "smooth", block: "start" });
+  timeline.focus({ preventScroll: true });
 });
 window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
@@ -641,7 +646,13 @@ function drawGainers(items) {
     const y = 14 + index * rowHeight;
     const change = Number(item.change24HoursPercent);
     const colour = change >= 0 ? "#12a66a" : "#d84d4d";
-    if (index % 2) { ctx.fillStyle = "rgba(16,32,27,.025)"; ctx.fillRect(0, y - 13, width, rowHeight); }
+    if (item.coin === selectedGainerCoin) {
+      ctx.fillStyle = "rgba(216,136,24,.28)";
+      ctx.fillRect(0, y - 13, width, rowHeight);
+    } else if (index % 2) {
+      ctx.fillStyle = "rgba(16,32,27,.025)";
+      ctx.fillRect(0, y - 13, width, rowHeight);
+    }
     ctx.fillStyle = "#64736e"; ctx.textAlign = "right";
     ctx.fillText(`#${item.rank}`, 28, y);
     ctx.fillStyle = "#10201b"; ctx.textAlign = "left"; ctx.font = "700 11px ui-monospace, Consolas, monospace";

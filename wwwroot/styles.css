@@ -63,6 +63,7 @@ button span { margin-left: 18px; }
 .chart-card { min-width: 0; padding: 20px; }
 .gainers-card, .wallet-card { min-width: 0; }
 .pullback-chart-card { margin-top: 14px; }
+.pullback-chart-card:focus { outline: 3px solid rgba(216,136,24,.6); outline-offset: 3px; }
 .pullback-chart-card canvas { height: 360px; }
 .pullback-controls { display: grid; grid-template-columns: auto auto; align-items: center; justify-items: end; gap: 5px 8px; }
 .pullback-controls label { color: var(--muted); font: 700 10px/1 ui-monospace, Consolas, monospace; letter-spacing: .08em; }
