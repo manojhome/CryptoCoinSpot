@@ -14,6 +14,50 @@ public sealed class DailyPriceStore(string dataDirectory)
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks =
         new(StringComparer.OrdinalIgnoreCase);
 
+    public async Task<DailyPriceLoad> GetOrBackfillAllTimeAsync(
+        string coin,
+        Func<CancellationToken, Task<IReadOnlyList<Candle>>> fetchAllDaily,
+        CancellationToken cancellationToken)
+    {
+        coin = CoinSpotClient.NormalizeCoin(coin);
+        var gate = _locks.GetOrAdd(coin, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            Directory.CreateDirectory(dataDirectory);
+            var path = FilePath(coin);
+            var existing = (await ReadFileAsync(path, cancellationToken))
+                .OrderBy(x => x.Time)
+                .ToArray();
+            var markerPath = AllTimeMarkerPath(coin);
+            if (existing.Length > 0 && File.Exists(markerPath))
+                return new DailyPriceLoad(existing, false);
+
+            var incoming = await fetchAllDaily(cancellationToken);
+            var existingDays = existing
+                .Select(x => DateOnly.FromDateTime(x.Time.UtcDateTime))
+                .ToHashSet();
+            var additions = incoming
+                .GroupBy(x => DateOnly.FromDateTime(x.Time.UtcDateTime))
+                .Select(x => x.OrderByDescending(c => c.Time).First())
+                .Where(x => !existingDays.Contains(DateOnly.FromDateTime(x.Time.UtcDateTime)))
+                .OrderBy(x => x.Time)
+                .ToArray();
+            var merged = existing.Concat(additions)
+                .OrderBy(x => x.Time)
+                .ToArray();
+
+            if (additions.Length > 0)
+                await WriteFileAsync(path, merged, cancellationToken);
+            await WriteAllTimeMarkerAsync(markerPath, cancellationToken);
+            return new DailyPriceLoad(merged, additions.Length > 0);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     public async Task<DailyPriceLoad> GetOrRefreshAsync(
         string coin,
         DateOnly latestCompletedDay,
@@ -104,6 +148,27 @@ public sealed class DailyPriceStore(string dataDirectory)
     }
 
     private string FilePath(string coin) => Path.Combine(dataDirectory, $"{coin}-daily.json");
+    private string AllTimeMarkerPath(string coin) =>
+        Path.Combine(dataDirectory, $"{coin}-daily-alltime.json");
+
+    private static async Task WriteAllTimeMarkerAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await File.WriteAllTextAsync(
+                temporaryPath,
+                JsonSerializer.Serialize(new { completedAt = DateTimeOffset.UtcNow }),
+                cancellationToken);
+            File.Move(temporaryPath, path, true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        }
+    }
 
     private static async Task WriteFileAsync(
         string path,

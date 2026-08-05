@@ -72,6 +72,46 @@ public sealed class MarketDataClient(HttpClient http)
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<Candle>> GetAllDailyAsync(
+        string coin, string currency, CancellationToken cancellationToken)
+    {
+        var symbol = CoinSpotClient.NormalizeCoin(coin);
+        var quote = currency.ToUpperInvariant();
+        if (quote is not ("AUD" or "USD" or "USDT"))
+            throw new ArgumentException("KuCoin dashboard candles support AUD, USD or USDT.");
+
+        var audMultiplier = quote == "AUD"
+            ? await GetCoinSpotPriceAsync("USDT", cancellationToken)
+            : (decimal?)null;
+        var todayUtc = DateTime.UtcNow.Date;
+        var windowEnd = new DateTimeOffset(todayUtc, TimeSpan.Zero);
+        var earliest = DateTimeOffset.UnixEpoch;
+        var candles = new Dictionary<DateOnly, Candle>();
+
+        while (windowEnd > earliest)
+        {
+            var windowStart = windowEnd.AddDays(-1490);
+            if (windowStart < earliest) windowStart = earliest;
+            var window = await GetKuCoinCandlesAsync(
+                symbol, "1day", windowStart, currency, cancellationToken,
+                windowEnd, allowEmpty: true, audMultiplier: audMultiplier);
+            if (window.Count == 0)
+            {
+                if (candles.Count > 0) break;
+            }
+            else
+            {
+                foreach (var candle in window.Where(x => x.Time.UtcDateTime.Date < todayUtc))
+                    candles[DateOnly.FromDateTime(candle.Time.UtcDateTime)] = candle;
+            }
+            windowEnd = windowStart.AddSeconds(-1);
+        }
+
+        if (candles.Count == 0)
+            throw new InvalidOperationException($"KuCoin returned no daily history for {symbol}.");
+        return candles.Values.OrderBy(x => x.Time).ToArray();
+    }
+
     public async Task<IReadOnlyList<MarketGainer>> GetTopCoinSpotGainersAsync(
         int limit, CancellationToken cancellationToken)
     {
@@ -134,7 +174,10 @@ public sealed class MarketDataClient(HttpClient http)
 
     private async Task<IReadOnlyList<Candle>> GetKuCoinCandlesAsync(
         string coin, string type, DateTimeOffset start, string currency,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DateTimeOffset? requestedEnd = null,
+        bool allowEmpty = false,
+        decimal? audMultiplier = null)
     {
         var quote = currency.ToUpperInvariant();
         if (quote is not ("AUD" or "USD" or "USDT"))
@@ -142,7 +185,7 @@ public sealed class MarketDataClient(HttpClient http)
         var market = coin.Equals("USDT", StringComparison.OrdinalIgnoreCase)
             ? "USDT-USDC"
             : $"{coin}-USDT";
-        var end = DateTimeOffset.UtcNow;
+        var end = requestedEnd ?? DateTimeOffset.UtcNow;
         var uri = $"{KuCoinRoot}/market/candles?type={type}&symbol={market}" +
                   $"&startAt={start.ToUnixTimeSeconds()}&endAt={end.ToUnixTimeSeconds()}";
         using var response = await GetWithRateLimitRetryAsync(uri, cancellationToken);
@@ -152,7 +195,7 @@ public sealed class MarketDataClient(HttpClient http)
         using var json = JsonDocument.Parse(text);
         ThrowIfKuCoinError(json.RootElement);
         var multiplier = quote == "AUD"
-            ? await GetCoinSpotPriceAsync("USDT", cancellationToken)
+            ? audMultiplier ?? await GetCoinSpotPriceAsync("USDT", cancellationToken)
             : 1m;
         var candles = json.RootElement.GetProperty("data").EnumerateArray()
             .Select(x => new Candle(
@@ -165,7 +208,8 @@ public sealed class MarketDataClient(HttpClient http)
             .Where(x => x.Close > 0)
             .OrderBy(x => x.Time)
             .ToArray();
-        if (candles.Length == 0) throw new InvalidOperationException($"KuCoin returned no candles for {market}.");
+        if (candles.Length == 0 && !allowEmpty)
+            throw new InvalidOperationException($"KuCoin returned no candles for {market}.");
         return candles;
     }
 

@@ -111,6 +111,46 @@ app.MapGet("/api/dashboard", async (
     }
 });
 
+app.MapGet("/api/history/{coin}", async (
+    string coin,
+    MarketDataClient market,
+    DailyPriceStore dailyPrices,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        coin = CoinSpotClient.NormalizeCoin(coin);
+        var history = await dailyPrices.GetOrBackfillAllTimeAsync(
+            coin,
+            token => market.GetAllDailyAsync(coin, "aud", token),
+            cancellationToken);
+        return Results.Ok(new
+        {
+            coin,
+            source = history.Updated
+                ? "KuCoin available history + permanent local file"
+                : "permanent local all-time file",
+            daily = history.Candles.Select(x => new
+            {
+                time = x.Time,
+                x.Open,
+                x.High,
+                x.Low,
+                x.Close,
+                x.Volume
+            })
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
 app.MapGet("/api/gainers", async (
     MarketDataClient market,
     Microsoft.Extensions.Caching.Memory.IMemoryCache cache,

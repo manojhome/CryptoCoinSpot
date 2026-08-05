@@ -222,8 +222,9 @@
           <div class="pullback-controls">
             <label for="pullbackPeriod">Period</label>
             <select id="pullbackPeriod">
-              <option value="365" selected>365 days</option>
-              <option value="183">6 months</option>
+              <option value="all">AllTime</option>
+              <option value="365">365 days</option>
+              <option value="183" selected>6 months</option>
               <option value="90">3 months</option>
               <option value="30">1 month</option>
               <option value="7">1 week</option>
@@ -235,7 +236,7 @@
           <span id="selectedBuyLegend" class="legend-buy">Select a strategy container to show signals</span>
           <span id="selectedSellLegend" class="legend-sell">Buy and sell lines are hidden by default</span>
         </div>
-        <canvas id="pullbackChart" aria-label="Interactive 365-day pullback context OHLC candlestick chart"></canvas>
+        <canvas id="pullbackChart" aria-label="Interactive selected-period TimelineData OHLC candlestick chart"></canvas>
       </article>
 
     </section>

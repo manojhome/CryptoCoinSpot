@@ -21,9 +21,14 @@ const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFra
 $("analyse").addEventListener("click", analyse);
 $("coin").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
 $("amount").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
-$("pullbackPeriod").addEventListener("change", () => {
+$("pullbackPeriod").addEventListener("change", async () => {
   pullbackHover = null;
-  if (snapshot) drawPullbackAnalysis(snapshot.daily);
+  if (!snapshot) return;
+  if ($("pullbackPeriod").value === "all") {
+    await loadAllTimeHistory();
+  } else {
+    drawPullbackAnalysis(snapshot.daily);
+  }
 });
 $("dailyPercentPeriod").addEventListener("change", () => {
   dailyPercentHover = null;
@@ -328,7 +333,10 @@ function drawDailyPercentageAnalysis(allCandles) {
 }
 
 function drawPullbackAnalysis(allCandles) {
-  const requestedDays = Number($("pullbackPeriod").value) || 365;
+  const selectedPeriod = $("pullbackPeriod").value;
+  const requestedDays = selectedPeriod === "all"
+    ? allCandles.length
+    : Number(selectedPeriod) || 183;
   pullbackCandles = allCandles.slice(-requestedDays);
   if (!pullbackCandles.length) return;
   const dailyLows = pullbackCandles.map(x => Number(x.low));
@@ -341,12 +349,32 @@ function drawPullbackAnalysis(allCandles) {
   const averageRange = dailyRanges.reduce((total, value) => total + value.difference, 0) / dailyRanges.length;
   const averageRangePercent = dailyRanges.reduce((total, value) => total + value.percentage, 0) / dailyRanges.length;
   $("dailyRangeAverage").textContent = `Avg ${number(averageRange, 5)} (${averageRangePercent.toFixed(2)}%)`;
-  $("pullbackChartRange").textContent = `${pullbackCandles.length} days · ${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
+  const periodLabel = selectedPeriod === "all" ? "AllTime" : `${pullbackCandles.length} days`;
+  $("pullbackChartRange").textContent = `${periodLabel} · ${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
   renderStreakMetrics(pullbackCandles);
   const investmentAmount = Number(snapshot?.amount) || 1000;
   strategySimulations = renderStrategySimulation(pullbackCandles, investmentAmount);
   updateSelectedStrategyMarkers();
   drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover, pullbackMarkers);
+}
+
+async function loadAllTimeHistory() {
+  const period = $("pullbackPeriod");
+  period.disabled = true;
+  $("pullbackChartRange").textContent = "Loading all available daily history…";
+  hideError();
+  try {
+    const response = await fetch(`/api/history/${encodeURIComponent(snapshot.coin)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || data.detail || "AllTime history update failed.");
+    snapshot.daily = data.daily;
+    drawPullbackAnalysis(snapshot.daily);
+  } catch (error) {
+    showError(error.message);
+    $("pullbackChartRange").textContent = "AllTime history unavailable";
+  } finally {
+    period.disabled = false;
+  }
 }
 
 function selectStrategy(key) {
