@@ -285,15 +285,20 @@ app.MapPost("/api/coinspot/trading/{side}/quote", async (
     {
         var coin = CoinSpotClient.NormalizeCoin(request.Coin);
         var amountType = request.AmountType.Trim().ToLowerInvariant();
+        var normalizedAmount = side == "sell" && amountType == "coin"
+            ? decimal.Round(request.Amount, 8, MidpointRounding.ToNegativeInfinity)
+            : request.Amount;
+        if (normalizedAmount <= 0)
+            return Results.BadRequest(new { error = "Trade amount must be positive after coin precision is applied." });
         var client = new CoinSpotClient(factory.CreateClient(nameof(CoinSpotClient)), apiKey, apiSecret);
         using var quoteJson = side == "buy"
-            ? await client.GetBuyQuoteAsync(coin, request.Amount, amountType, cancellationToken)
-            : await client.GetSellQuoteAsync(coin, request.Amount, amountType, cancellationToken);
+            ? await client.GetBuyQuoteAsync(coin, normalizedAmount, amountType, cancellationToken)
+            : await client.GetSellQuoteAsync(coin, normalizedAmount, amountType, cancellationToken);
         var rate = ReadJsonDecimal(quoteJson.RootElement.GetProperty("rate"));
         var expiresAt = DateTimeOffset.UtcNow.AddSeconds(60);
         var quoteToken = Guid.NewGuid().ToString("N");
         var quote = new CoinSpotTradeQuote(
-            side, coin, request.Amount, amountType, rate, expiresAt);
+            side, coin, normalizedAmount, amountType, rate, expiresAt);
         cache.Set($"coinspot-live-quote:{quoteToken}", quote, expiresAt);
 
         return Results.Ok(new
@@ -301,7 +306,7 @@ app.MapPost("/api/coinspot/trading/{side}/quote", async (
             quoteToken,
             side,
             coin,
-            amount = request.Amount,
+            amount = normalizedAmount,
             amountType,
             rate,
             expiresAt,

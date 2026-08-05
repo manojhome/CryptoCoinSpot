@@ -73,7 +73,11 @@ Untouched buy rows in **My buy and sell transactions** also provide a live row
 action. **Refresh quote** obtains a 60-second quote for the row's full coin amount
 and updates its projected P/L. **Sell whole row** then submits that real sell order
 immediately without another confirmation prompt. Partially or fully matched buys
-cannot use this row action.
+cannot use this row action. Before quoting, the app refreshes the wallet balance,
+caps the requested quantity to the amount CoinSpot currently reports as available,
+and floors sell quantities to CoinSpot's eight-decimal coin precision. It checks
+the wallet again at execution time and automatically refreshes the quote if the
+available balance decreased during the quote window.
 
 ## Data and analysis
 

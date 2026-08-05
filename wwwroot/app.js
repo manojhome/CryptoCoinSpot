@@ -19,6 +19,7 @@ const liveTradeQuotes = { buy: null, sell: null };
 let liveSellAmountType = "coin";
 let liveTransactionsSnapshot = [];
 const liveRowSellQuotes = new Map();
+const COIN_AMOUNT_EPSILON = 0.00000001;
 
 const aud = (n, digits = 4) => `$${Number(n).toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFractionDigits: digits });
@@ -310,10 +311,11 @@ function drawLiveTransactions() {
     } else {
       let sellRemaining = coinAmount;
       for (const lot of buyLots.get(coin) || []) {
-        if (sellRemaining <= 0) break;
+        if (sellRemaining <= COIN_AMOUNT_EPSILON) break;
         const consumed = Math.min(lot.remaining, sellRemaining);
         lot.remaining -= consumed;
         sellRemaining -= consumed;
+        if (lot.remaining <= COIN_AMOUNT_EPSILON) lot.remaining = 0;
       }
       const matched = Math.min(Math.max(state.quantity, 0), coinAmount);
       if (matched > 0 && state.quantity > 0) {
@@ -324,6 +326,10 @@ function drawLiveTransactions() {
         state.matchedSells += 1;
         state.quantity -= matched;
         state.cost = Math.max(0, state.cost - averageCost * matched);
+        if (state.quantity <= COIN_AMOUNT_EPSILON) {
+          state.quantity = 0;
+          state.cost = 0;
+        }
         rowPnl.set(index, { value: realized, label: matched < coinAmount ? "partial realized" : "realized" });
       } else {
         state.unmatchedSells += 1;
@@ -357,7 +363,7 @@ function drawLiveTransactions() {
     const currentRate = currentRates.get(coin);
     for (const lot of lots) {
       const soldAmount = lot.original - lot.remaining;
-      if (soldAmount <= 0.000000000001) {
+      if (soldAmount <= COIN_AMOUNT_EPSILON) {
         saleNowByTransaction.set(lot.transaction, Number.isFinite(currentRate)
           ? {
               sellableAmount: lot.original,
@@ -368,7 +374,7 @@ function drawLiveTransactions() {
           : { sellableAmount: lot.original, costAud: lot.totalAud, status: "Current rate unavailable" });
       } else {
         saleNowByTransaction.set(lot.transaction, {
-          status: lot.remaining > 0.000000000001 ? "Partially sold" : "Sold"
+          status: lot.remaining > COIN_AMOUNT_EPSILON ? "Partially sold" : "Sold"
         });
       }
     }
@@ -461,14 +467,16 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
 
 function showLiveRowQuote(quote, saleNow, saleNowCell, quoteStatus) {
   const rate = Number(quote.rate);
-  const estimatedProceeds = Number(quote.amount) * rate;
+  const quotedAmount = Number(quote.amount);
+  const estimatedProceeds = quotedAmount * rate;
   quoteStatus.className = "transaction-row-quote success";
-  quoteStatus.textContent = `${aud(rate, rate < 1 ? 8 : 2)} · est. ${aud(estimatedProceeds, 2)} · expires in 60s`;
-  const projected = estimatedProceeds * .99 - Number(saleNow.costAud);
+  quoteStatus.textContent = `${aud(rate, rate < 1 ? 8 : 2)} · selling ${number(quotedAmount, 8)} ${quote.coin} · est. ${aud(estimatedProceeds, 2)} · expires in 60s`;
+  const allocatedCost = Number(saleNow.costAud) * quotedAmount / Number(saleNow.sellableAmount);
+  const projected = estimatedProceeds * .99 - allocatedCost;
   saleNowCell.className = `transaction-pnl ${projected >= 0 ? "profit" : "loss"}`;
   saleNowCell.replaceChildren(document.createTextNode(formatPnl(projected)));
   const note = document.createElement("small");
-  note.textContent = "at live quote after est. 1% sell fee";
+  note.textContent = `${quote.rowAmountAdjusted ? "capped to available wallet balance · " : ""}at live quote after est. 1% sell fee`;
   saleNowCell.appendChild(note);
 }
 
@@ -478,13 +486,17 @@ async function requestLiveRowSellQuote(transaction, saleNow, refreshButton, sell
   quoteStatus.className = "transaction-row-quote";
   quoteStatus.textContent = "Requesting live CoinSpot sell quote…";
   try {
+    const holding = await fetchCurrentWalletHolding(transaction.coin);
+    const availableAmount = Number(holding?.balance);
+    const sellAmount = Math.min(Number(saleNow.sellableAmount), availableAmount);
     const response = await fetch("/api/coinspot/trading/sell/quote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coin: transaction.coin, amount: saleNow.sellableAmount, amountType: "coin" })
+      body: JSON.stringify({ coin: transaction.coin, amount: sellAmount, amountType: "coin" })
     });
     const quote = await readApiJson(response, "Row sell quote");
     if (!response.ok) throw new Error(quote.error || quote.detail || "Sell quote failed.");
+    quote.rowAmountAdjusted = Number(quote.amount) < Number(saleNow.sellableAmount);
     liveRowSellQuotes.set(liveRowTransactionKey(transaction), quote);
     showLiveRowQuote(quote, saleNow, saleNowCell, quoteStatus);
     sellButton.disabled = !liveTradingStatus.ready;
@@ -499,7 +511,7 @@ async function requestLiveRowSellQuote(transaction, saleNow, refreshButton, sell
 
 async function executeLiveRowSell(transaction, refreshButton, sellButton, quoteStatus) {
   const key = liveRowTransactionKey(transaction);
-  const quote = liveRowSellQuotes.get(key);
+  let quote = liveRowSellQuotes.get(key);
   if (!quote || new Date(quote.expiresAt).getTime() <= Date.now()) {
     liveRowSellQuotes.delete(key);
     sellButton.disabled = true;
@@ -513,6 +525,20 @@ async function executeLiveRowSell(transaction, refreshButton, sellButton, quoteS
   quoteStatus.className = "transaction-row-quote";
   quoteStatus.textContent = `Submitting LIVE SELL for ${number(quote.amount, 8)} ${quote.coin}…`;
   try {
+    const holding = await fetchCurrentWalletHolding(quote.coin);
+    const availableAmount = Number(holding.balance);
+    if (availableAmount < Number(quote.amount)) {
+      quoteStatus.textContent = "Wallet balance changed · refreshing the quote before LIVE SELL…";
+      const refreshResponse = await fetch("/api/coinspot/trading/sell/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coin: quote.coin, amount: availableAmount, amountType: "coin" })
+      });
+      const refreshedQuote = await readApiJson(refreshResponse, "Adjusted row sell quote");
+      if (!refreshResponse.ok) throw new Error(refreshedQuote.error || refreshedQuote.detail || "Adjusted sell quote failed.");
+      quote = refreshedQuote;
+      liveRowSellQuotes.set(key, quote);
+    }
     const response = await fetch("/api/coinspot/trading/sell/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -536,6 +562,18 @@ async function executeLiveRowSell(transaction, refreshButton, sellButton, quoteS
     quoteStatus.textContent = error.message;
     refreshButton.disabled = !liveTradingStatus.configured;
   }
+}
+
+async function fetchCurrentWalletHolding(coin) {
+  const walletResponse = await fetch("/api/coinspot/wallet", { cache: "no-store" });
+  const wallet = await readApiJson(walletResponse, "Current wallet balance");
+  if (!walletResponse.ok) throw new Error(wallet.error || wallet.detail || "Current wallet balance failed.");
+  const holding = (wallet.items || []).find(item => item.coin === coin);
+  const availableAmount = Number(holding?.balance);
+  if (!Number.isFinite(availableAmount) || availableAmount <= 0) {
+    throw new Error(`Your CoinSpot wallet has no available ${coin} to sell.`);
+  }
+  return holding;
 }
 
 function appendTransactionCell(row, value) {
