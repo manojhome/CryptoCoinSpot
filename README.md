@@ -69,6 +69,12 @@ and immediately submits the real sell order without a confirmation prompt. The
 same balance checks, single-use token, live-trading setting, and 1% rate threshold
 still apply.
 
+Untouched buy rows in **My buy and sell transactions** also provide a live row
+action. **Refresh quote** obtains a 60-second quote for the row's full coin amount
+and updates its projected P/L. **Sell whole row** then submits that real sell order
+immediately without another confirmation prompt. Partially or fully matched buys
+cannot use this row action.
+
 ## Data and analysis
 
 CoinSpot's public API exposes current prices and only recent completed orders,
@@ -109,7 +115,8 @@ are excluded from Git; `Data/.gitkeep` preserves the directory in the repository
 ## Stored live transactions
 
 Every successful live Buy, Sell, or AutoSell submitted by this app is appended
-to `Data/live-trades.json`. The transaction container uses weighted-average cost
+to `Data/live-trades.json`, including prompt-free whole-row sells. The transaction
+container uses weighted-average cost
 for realized sell P/L and the current wallet rate for unrealized P/L. Sells made
 against coins acquired outside this app show `N/A` until a recorded buy cost is
 available. Each new entry stores an estimated fee using CoinSpot's current 1%

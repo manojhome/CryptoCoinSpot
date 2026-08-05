@@ -292,12 +292,12 @@
         <div><p class="label">PERMANENT DATA / LIVE ORDERS</p><h2 id="liveTransactionsHeading">My buy and sell transactions</h2></div>
         <span id="liveTransactionsStatus">Loading transactions…</span>
       </div>
-      <p class="data-note">Stored permanently in Data/live-trades.json. The estimated fee uses CoinSpot’s current 1% Instant Buy/Sell rate. The final column projects a whole-row sale only when no sell has been matched to that buy and includes the estimated sell fee.</p>
+      <p class="data-note">Stored permanently in Data/live-trades.json. The estimated fee uses CoinSpot’s current 1% Instant Buy/Sell rate. For an untouched buy row, refresh its live sell quote before using Sell whole row. That button submits a real CoinSpot order immediately without another prompt. The final column includes the estimated sell fee.</p>
       <div id="liveTransactionSummaries" class="transaction-summaries"></div>
       <div class="transaction-table-wrap">
         <table class="transaction-table">
-          <thead><tr><th>Date / time</th><th>Coin</th><th>Side</th><th>Coin amount</th><th>AUD total</th><th>Execution rate</th><th>Estimated fee</th><th>Profit / loss</th><th>If whole row sold now</th></tr></thead>
-          <tbody id="liveTransactionsBody"><tr><td colspan="9">No transactions recorded yet.</td></tr></tbody>
+          <thead><tr><th>Date / time</th><th>Coin</th><th>Side</th><th>Coin amount</th><th>AUD total</th><th>Execution rate</th><th>Estimated fee</th><th>Profit / loss</th><th>Live row action</th><th>If whole row sold now</th></tr></thead>
+          <tbody id="liveTransactionsBody"><tr><td colspan="10">No transactions recorded yet.</td></tr></tbody>
         </table>
       </div>
     </article>

@@ -88,13 +88,20 @@ button span { margin-left: 18px; }
 .transaction-summary.profit > strong { color: var(--green-dark); }
 .transaction-summary.loss > strong { color: var(--red); }
 .transaction-table-wrap { max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
-.transaction-table { min-width: 1020px; margin-top: 0; }
+.transaction-table { min-width: 1280px; margin-top: 0; }
 .transaction-side { display: inline-block; min-width: 42px; padding: 4px 6px; border-radius: 999px; color: white; text-align: center; font-size: 9px; font-weight: 850; }
 .transaction-side.buy { background: var(--green); }
 .transaction-side.sell { background: var(--red); }
 .transaction-pnl.profit { color: var(--green-dark); font-weight: 850; }
 .transaction-pnl.loss { color: var(--red); font-weight: 850; }
 .transaction-pnl small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; }
+.transaction-row-actions { min-width: 200px; }
+.transaction-row-buttons { display: flex; gap: 6px; }
+.transaction-row-buttons button { height: 30px; padding: 0 9px; border-radius: 7px; font-size: 9px; white-space: nowrap; }
+.transaction-row-buttons .row-sell-button { color: white; background: var(--red); }
+.transaction-row-quote { display: block; margin-top: 5px; color: var(--muted); font: 650 8px/1.35 ui-monospace, Consolas, monospace; }
+.transaction-row-quote.success { color: var(--green-dark); }
+.transaction-row-quote.failure { color: var(--red); }
 
 .signal-strip { margin-top: 22px; padding: 24px 28px; display: grid; grid-template-columns: 210px 1fr; align-items: center; gap: 26px; background: var(--card); border: 1px solid var(--line); border-left: 7px solid var(--amber); border-radius: 14px; }
 .signal { margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -.03em; }

@@ -18,6 +18,7 @@ let liveTradingStatus = { configured: false, enabled: false, ready: false };
 const liveTradeQuotes = { buy: null, sell: null };
 let liveSellAmountType = "coin";
 let liveTransactionsSnapshot = [];
+const liveRowSellQuotes = new Map();
 
 const aud = (n, digits = 4) => `$${Number(n).toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFractionDigits: digits });
@@ -122,12 +123,14 @@ async function loadLiveTradingStatus() {
         : "FULL-ACCESS API NOT CONFIGURED";
     resetLiveTradeQuote("buy");
     resetLiveTradeQuote("sell");
+    drawLiveTransactions();
   } catch (error) {
     status.className = "trade-status blocked";
     status.textContent = "TRADING STATUS UNAVAILABLE";
     $("liveBuyResult").textContent = error.message;
     $("liveSellResult").textContent = error.message;
     $("liveSellAuto").disabled = true;
+    drawLiveTransactions();
   }
 }
 
@@ -275,7 +278,7 @@ function drawLiveTransactions() {
   if (!liveTransactionsSnapshot.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 9;
+    cell.colSpan = 10;
     cell.textContent = "No live transactions recorded through this app yet.";
     row.appendChild(cell); body.appendChild(row);
     return;
@@ -357,10 +360,12 @@ function drawLiveTransactions() {
       if (soldAmount <= 0.000000000001) {
         saleNowByTransaction.set(lot.transaction, Number.isFinite(currentRate)
           ? {
+              sellableAmount: lot.original,
+              costAud: lot.totalAud,
               value: lot.original * currentRate * .99 - lot.totalAud,
               label: `at ${aud(currentRate, currentRate < 1 ? 8 : 2)} after est. 1% sell fee`
             }
-          : { status: "Current rate unavailable" });
+          : { sellableAmount: lot.original, costAud: lot.totalAud, status: "Current rate unavailable" });
       } else {
         saleNowByTransaction.set(lot.transaction, {
           status: lot.remaining > 0.000000000001 ? "Partially sold" : "Sold"
@@ -399,8 +404,138 @@ function drawLiveTransactions() {
       } else {
         saleNowCell.textContent = transaction.side === "buy" ? saleNow?.status || "N/A" : "—";
       }
+      row.appendChild(createLiveRowSellCell(transaction, saleNow, saleNowCell));
       row.appendChild(saleNowCell); body.appendChild(row);
     });
+}
+
+function liveRowTransactionKey(transaction) {
+  return transaction.id || `${transaction.executedAt}|${transaction.coin}|${transaction.coinAmount}`;
+}
+
+function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
+  const cell = document.createElement("td");
+  cell.className = "transaction-row-actions";
+  if (transaction.side !== "buy") {
+    cell.textContent = "—";
+    return cell;
+  }
+  if (!saleNow?.sellableAmount) {
+    cell.textContent = saleNow?.status || "Unavailable";
+    return cell;
+  }
+
+  const buttons = document.createElement("div");
+  buttons.className = "transaction-row-buttons";
+  const refreshButton = document.createElement("button");
+  refreshButton.type = "button";
+  refreshButton.textContent = "Refresh quote";
+  refreshButton.disabled = !liveTradingStatus.configured;
+  const sellButton = document.createElement("button");
+  sellButton.type = "button";
+  sellButton.className = "row-sell-button";
+  sellButton.textContent = "Sell whole row";
+  sellButton.disabled = true;
+  const quoteStatus = document.createElement("small");
+  quoteStatus.className = "transaction-row-quote";
+  quoteStatus.textContent = liveTradingStatus.configured
+    ? "Refresh to obtain a 60-second quote"
+    : "Full-access trading API unavailable";
+  buttons.append(refreshButton, sellButton);
+  cell.append(buttons, quoteStatus);
+
+  const key = liveRowTransactionKey(transaction);
+  const existing = liveRowSellQuotes.get(key);
+  if (existing && new Date(existing.expiresAt).getTime() > Date.now()) {
+    showLiveRowQuote(existing, saleNow, saleNowCell, quoteStatus);
+    sellButton.disabled = !liveTradingStatus.ready;
+  } else {
+    liveRowSellQuotes.delete(key);
+  }
+  refreshButton.addEventListener("click", () => requestLiveRowSellQuote(
+    transaction, saleNow, refreshButton, sellButton, quoteStatus, saleNowCell));
+  sellButton.addEventListener("click", () => executeLiveRowSell(
+    transaction, refreshButton, sellButton, quoteStatus));
+  return cell;
+}
+
+function showLiveRowQuote(quote, saleNow, saleNowCell, quoteStatus) {
+  const rate = Number(quote.rate);
+  const estimatedProceeds = Number(quote.amount) * rate;
+  quoteStatus.className = "transaction-row-quote success";
+  quoteStatus.textContent = `${aud(rate, rate < 1 ? 8 : 2)} · est. ${aud(estimatedProceeds, 2)} · expires in 60s`;
+  const projected = estimatedProceeds * .99 - Number(saleNow.costAud);
+  saleNowCell.className = `transaction-pnl ${projected >= 0 ? "profit" : "loss"}`;
+  saleNowCell.replaceChildren(document.createTextNode(formatPnl(projected)));
+  const note = document.createElement("small");
+  note.textContent = "at live quote after est. 1% sell fee";
+  saleNowCell.appendChild(note);
+}
+
+async function requestLiveRowSellQuote(transaction, saleNow, refreshButton, sellButton, quoteStatus, saleNowCell) {
+  refreshButton.disabled = true;
+  sellButton.disabled = true;
+  quoteStatus.className = "transaction-row-quote";
+  quoteStatus.textContent = "Requesting live CoinSpot sell quote…";
+  try {
+    const response = await fetch("/api/coinspot/trading/sell/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coin: transaction.coin, amount: saleNow.sellableAmount, amountType: "coin" })
+    });
+    const quote = await readApiJson(response, "Row sell quote");
+    if (!response.ok) throw new Error(quote.error || quote.detail || "Sell quote failed.");
+    liveRowSellQuotes.set(liveRowTransactionKey(transaction), quote);
+    showLiveRowQuote(quote, saleNow, saleNowCell, quoteStatus);
+    sellButton.disabled = !liveTradingStatus.ready;
+  } catch (error) {
+    liveRowSellQuotes.delete(liveRowTransactionKey(transaction));
+    quoteStatus.className = "transaction-row-quote failure";
+    quoteStatus.textContent = error.message;
+  } finally {
+    refreshButton.disabled = !liveTradingStatus.configured;
+  }
+}
+
+async function executeLiveRowSell(transaction, refreshButton, sellButton, quoteStatus) {
+  const key = liveRowTransactionKey(transaction);
+  const quote = liveRowSellQuotes.get(key);
+  if (!quote || new Date(quote.expiresAt).getTime() <= Date.now()) {
+    liveRowSellQuotes.delete(key);
+    sellButton.disabled = true;
+    quoteStatus.className = "transaction-row-quote failure";
+    quoteStatus.textContent = "Quote expired. Refresh it before selling.";
+    return;
+  }
+
+  refreshButton.disabled = true;
+  sellButton.disabled = true;
+  quoteStatus.className = "transaction-row-quote";
+  quoteStatus.textContent = `Submitting LIVE SELL for ${number(quote.amount, 8)} ${quote.coin}…`;
+  try {
+    const response = await fetch("/api/coinspot/trading/sell/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        coin: quote.coin,
+        amount: quote.amount,
+        amountType: "coin",
+        quoteToken: quote.quoteToken,
+        confirmation: `LIVE SELL ${quote.coin}`
+      })
+    });
+    const data = await readApiJson(response, "Row sell execution");
+    if (!response.ok) throw new Error(data.error || data.detail || "Sell execution failed.");
+    liveRowSellQuotes.delete(key);
+    quoteStatus.className = "transaction-row-quote success";
+    quoteStatus.textContent = `LIVE SELL completed${data.persistenceWarning ? ` · ${data.persistenceWarning}` : ""}`;
+    await Promise.all([loadWallet(), loadLiveTransactions()]);
+  } catch (error) {
+    liveRowSellQuotes.delete(key);
+    quoteStatus.className = "transaction-row-quote failure";
+    quoteStatus.textContent = error.message;
+    refreshButton.disabled = !liveTradingStatus.configured;
+  }
 }
 
 function appendTransactionCell(row, value) {
