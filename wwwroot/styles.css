@@ -44,6 +44,30 @@ button:disabled { opacity: .55; cursor: wait; transform: none; }
 button span { margin-left: 18px; }
 .hint { grid-column: 1 / -1; margin: 0; color: #899a93; font-size: 12px; }
 .error { margin: 18px 0; padding: 14px 18px; color: #7b2020; background: #ffeded; border: 1px solid #f3c3c3; border-radius: 10px; }
+.live-trade-panel { margin-top: 14px; padding: 22px; background: var(--card); border: 2px solid rgba(216,136,24,.5); border-radius: 18px; box-shadow: 0 14px 36px rgba(16,32,27,.08); }
+.live-trade-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.live-trade-heading h2 { margin: 0; font-size: 24px; }
+.trade-status { padding: 7px 10px; color: #8a5a11; background: rgba(216,136,24,.12); border: 1px solid rgba(216,136,24,.35); border-radius: 999px; font: 750 11px/1 ui-monospace, Consolas, monospace; }
+.trade-status.ready { color: var(--green-dark); background: rgba(18,166,106,.1); border-color: rgba(18,166,106,.4); }
+.trade-status.blocked { color: #8f3434; background: rgba(216,77,77,.1); border-color: rgba(216,77,77,.35); }
+.live-trade-warning { margin: 10px 0 16px; color: #8a5a11; font-size: 12px; line-height: 1.5; }
+.live-trade-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+.live-trade-card { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.live-trade-card.buy-card { border-top: 4px solid var(--green); }
+.live-trade-card.sell-card { border-top: 4px solid var(--red); }
+.live-trade-card h3 { margin: 0 0 16px; font-size: 19px; }
+.live-trade-card label { color: var(--muted); }
+.live-trade-card input { color: var(--ink); background: var(--card); border-color: var(--line); }
+.trade-money-input { position: relative; }
+.trade-money-input span { position: absolute; left: 15px; top: 15px; z-index: 1; color: var(--green-dark); font-weight: 850; }
+.trade-money-input input { padding-left: 40px; }
+.trade-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 13px; }
+.trade-actions button { height: 44px; padding: 0 12px; font-size: 13px; }
+.sell-card .trade-actions button:first-child { color: white; background: var(--red); }
+.execute-button { color: white; background: var(--ink); }
+.trade-result { display: block; min-height: 38px; margin-top: 12px; color: var(--muted); font: 650 11px/1.5 ui-monospace, Consolas, monospace; }
+.trade-result.success { color: var(--green-dark); }
+.trade-result.failure { color: var(--red); }
 
 .signal-strip { margin-top: 22px; padding: 24px 28px; display: grid; grid-template-columns: 210px 1fr; align-items: center; gap: 26px; background: var(--card); border: 1px solid var(--line); border-left: 7px solid var(--amber); border-radius: 14px; }
 .signal { margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -.03em; }
@@ -157,6 +181,7 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .control-panel { grid-template-columns: 1fr 1fr; }
   .control-panel button { grid-column: 1 / -1; }
   .bottom-charts { grid-template-columns: 1fr; }
+  .live-trade-grid { grid-template-columns: 1fr; }
   .streak-metrics { grid-template-columns: repeat(3, 1fr); }
   .strategy-summaries { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metrics { grid-template-columns: 1fr 1fr; }
@@ -172,6 +197,8 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .pullback-heading { align-items: flex-start; flex-direction: column; }
   .pullback-meta { justify-content: flex-start; }
   .pullback-chart-card .card-head { flex-direction: column; }
+  .live-trade-heading { flex-direction: column; }
+  .trade-actions { grid-template-columns: 1fr; }
   .pullback-controls { justify-items: start; }
   .pullback-period-row { justify-content: flex-start; }
 }

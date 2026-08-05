@@ -55,3 +55,18 @@ public sealed record WalletHolding(
     decimal Balance,
     decimal AudBalance,
     decimal RateAud);
+
+public sealed record CoinSpotTradeRequest(
+    string Coin,
+    decimal Amount,
+    string AmountType,
+    string? QuoteToken = null,
+    string? Confirmation = null);
+
+public sealed record CoinSpotTradeQuote(
+    string Side,
+    string Coin,
+    decimal Amount,
+    string AmountType,
+    decimal Rate,
+    DateTimeOffset ExpiresAt);

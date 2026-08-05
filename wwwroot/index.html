@@ -13,7 +13,7 @@
       <div>
         <p class="eyebrow">CRYPTOCOINSPOT / PAPER MONITOR</p>
         <h1>Wait for the pullback.<br><span>Act on confirmation.</span></h1>
-        <p class="intro">An hourly market dashboard for testing the trend-and-pullback pattern without placing a trade.</p>
+        <p class="intro">An hourly market dashboard for trend analysis, paper strategies, and explicitly confirmed CoinSpot live orders.</p>
       </div>
       <div class="refresh-box">
         <span class="live-dot"></span>
@@ -50,6 +50,41 @@
       </label>
       <button id="analyse">Analyse investment <span>→</span></button>
       <p class="hint">Try BTC, ETH, XRP, TRX, USDT, SOL or USDC. No real order is placed.</p>
+    </section>
+
+    <section class="live-trade-panel" aria-labelledby="liveTradeHeading">
+      <div class="live-trade-heading">
+        <div><p class="label">COINSPOT DIRECT API / REAL FUNDS</p><h2 id="liveTradeHeading">Live trading</h2></div>
+        <span id="liveTradingStatus" class="trade-status">Checking configuration…</span>
+      </div>
+      <p class="live-trade-warning">Instant orders execute against your real CoinSpot account and cannot be undone. Obtain a fresh quote and review it before confirming.</p>
+      <div class="live-trade-grid">
+        <article class="live-trade-card buy-card">
+          <p class="label">BUY NOW</p>
+          <h3>Buy <span class="tradeCoin">TRX</span> with AUD</h3>
+          <label>Amount to spend (AUD)
+            <div class="trade-money-input"><span>$</span><input id="liveBuyAmount" type="number" min="0.01" step="1" value="10"></div>
+          </label>
+          <div class="trade-actions">
+            <button id="liveBuyQuote" type="button" disabled>Get buy quote</button>
+            <button id="liveBuyExecute" class="execute-button" type="button" disabled>Confirm live buy</button>
+          </div>
+          <output id="liveBuyResult" class="trade-result">Configure a full-access API key to request a quote.</output>
+        </article>
+
+        <article class="live-trade-card sell-card">
+          <p class="label">SELL NOW</p>
+          <h3>Sell <span class="tradeCoin">TRX</span> for AUD</h3>
+          <label>Coin amount to sell
+            <input id="liveSellAmount" type="number" min="0.00000001" step="0.00000001" value="0.001">
+          </label>
+          <div class="trade-actions">
+            <button id="liveSellQuote" type="button" disabled>Get sell quote</button>
+            <button id="liveSellExecute" class="execute-button" type="button" disabled>Confirm live sell</button>
+          </div>
+          <output id="liveSellResult" class="trade-result">Configure a full-access API key to request a quote.</output>
+        </article>
+      </div>
     </section>
 
     <div id="error" class="error" role="alert" hidden></div>
@@ -241,7 +276,7 @@
 
     </section>
 
-    <footer>This is a descriptive paper-trading tool, not financial advice. Market feeds can differ from executable CoinSpot prices.</footer>
+    <footer>This is not financial advice. Live trading uses real funds, and market feeds can differ from executable CoinSpot prices.</footer>
   </main>
   <script src="/app.js"></script>
 </body>

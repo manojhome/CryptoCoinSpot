@@ -242,9 +242,166 @@ app.MapGet("/api/coinspot/wallet", async (
     }
 });
 
+app.MapGet("/api/coinspot/trading/status", (
+    HttpContext context,
+    IConfiguration configuration) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    var (apiKey, apiSecret) = GetTradingCredentials(configuration);
+    var configured = !string.IsNullOrWhiteSpace(apiKey) && !string.IsNullOrWhiteSpace(apiSecret);
+    var enabled = IsLiveTradingEnabled(configuration);
+    return Results.Ok(new
+    {
+        configured,
+        enabled,
+        ready = configured && enabled,
+        quoteOnly = configured && !enabled
+    });
+});
+
+app.MapPost("/api/coinspot/trading/{side}/quote", async (
+    string side,
+    CoinSpotTradeRequest request,
+    HttpContext context,
+    IHttpClientFactory factory,
+    IConfiguration configuration,
+    IMemoryCache cache,
+    CancellationToken cancellationToken) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    side = side.Trim().ToLowerInvariant();
+    if (side is not ("buy" or "sell"))
+        return Results.BadRequest(new { error = "Trade side must be buy or sell." });
+
+    var (apiKey, apiSecret) = GetTradingCredentials(configuration);
+    if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
+        return Results.Problem(
+            "Configure the CoinSpot full-access API key and secret before requesting live quotes.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+
+    try
+    {
+        var coin = CoinSpotClient.NormalizeCoin(request.Coin);
+        var amountType = request.AmountType.Trim().ToLowerInvariant();
+        var client = new CoinSpotClient(factory.CreateClient(nameof(CoinSpotClient)), apiKey, apiSecret);
+        using var quoteJson = side == "buy"
+            ? await client.GetBuyQuoteAsync(coin, request.Amount, amountType, cancellationToken)
+            : await client.GetSellQuoteAsync(coin, request.Amount, amountType, cancellationToken);
+        var rate = ReadJsonDecimal(quoteJson.RootElement.GetProperty("rate"));
+        var expiresAt = DateTimeOffset.UtcNow.AddSeconds(60);
+        var quoteToken = Guid.NewGuid().ToString("N");
+        var quote = new CoinSpotTradeQuote(
+            side, coin, request.Amount, amountType, rate, expiresAt);
+        cache.Set($"coinspot-live-quote:{quoteToken}", quote, expiresAt);
+
+        return Results.Ok(new
+        {
+            quoteToken,
+            side,
+            coin,
+            amount = request.Amount,
+            amountType,
+            rate,
+            expiresAt,
+            executionEnabled = IsLiveTradingEnabled(configuration)
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
+app.MapPost("/api/coinspot/trading/{side}/execute", async (
+    string side,
+    CoinSpotTradeRequest request,
+    HttpContext context,
+    IHttpClientFactory factory,
+    IConfiguration configuration,
+    IMemoryCache cache,
+    CancellationToken cancellationToken) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    side = side.Trim().ToLowerInvariant();
+    if (side is not ("buy" or "sell"))
+        return Results.BadRequest(new { error = "Trade side must be buy or sell." });
+    if (!IsLiveTradingEnabled(configuration))
+        return Results.Problem(
+            "Live trading is disabled. Set CoinSpot:LiveTradingEnabled to true only when you intend to place real orders.",
+            statusCode: StatusCodes.Status403Forbidden);
+
+    var (apiKey, apiSecret) = GetTradingCredentials(configuration);
+    if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(apiSecret))
+        return Results.Problem(
+            "Configure the CoinSpot full-access API key and secret before live trading.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+
+    try
+    {
+        var coin = CoinSpotClient.NormalizeCoin(request.Coin);
+        var amountType = request.AmountType.Trim().ToLowerInvariant();
+        var expectedConfirmation = $"LIVE {side.ToUpperInvariant()} {coin}";
+        if (!string.Equals(request.Confirmation, expectedConfirmation, StringComparison.Ordinal))
+            return Results.BadRequest(new { error = $"Confirmation must exactly match {expectedConfirmation}." });
+        if (string.IsNullOrWhiteSpace(request.QuoteToken) ||
+            !cache.TryGetValue<CoinSpotTradeQuote>(
+                $"coinspot-live-quote:{request.QuoteToken}", out var quote) || quote is null)
+            return Results.BadRequest(new { error = "The live quote is missing, expired, or already used. Request a new quote." });
+        if (!string.Equals(quote.Side, side, StringComparison.Ordinal) ||
+            !string.Equals(quote.Coin, coin, StringComparison.Ordinal) ||
+            quote.Amount != request.Amount ||
+            !string.Equals(quote.AmountType, amountType, StringComparison.Ordinal))
+            return Results.BadRequest(new { error = "The execution request does not match the live quote." });
+
+        // Consume before sending the order so double-clicks and retries cannot reuse it.
+        cache.Remove($"coinspot-live-quote:{request.QuoteToken}");
+        var client = new CoinSpotClient(factory.CreateClient(nameof(CoinSpotClient)), apiKey, apiSecret);
+        using var orderJson = side == "buy"
+            ? await client.BuyNowAsync(coin, request.Amount, amountType, quote.Rate, 1m, cancellationToken)
+            : await client.SellNowAsync(coin, request.Amount, amountType, quote.Rate, 1m, cancellationToken);
+
+        return Results.Ok(new
+        {
+            side,
+            coin,
+            order = orderJson.RootElement.Clone(),
+            executedAt = DateTimeOffset.UtcNow
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
 app.Map("/api/{**path}", () => Results.NotFound(new
 {
     error = "The requested API endpoint is unavailable. Restart the app after updating it and try again."
 }));
 app.MapFallbackToFile("index.html");
 app.Run();
+
+static (string? ApiKey, string? ApiSecret) GetTradingCredentials(IConfiguration configuration) =>
+    (Environment.GetEnvironmentVariable("COINSPOT_API_KEY") ?? configuration["CoinSpot:ApiKey"],
+     Environment.GetEnvironmentVariable("COINSPOT_API_SECRET") ?? configuration["CoinSpot:ApiSecret"]);
+
+static bool IsLiveTradingEnabled(IConfiguration configuration)
+{
+    var environmentValue = Environment.GetEnvironmentVariable("COINSPOT_LIVE_TRADING_ENABLED");
+    return bool.TryParse(environmentValue, out var enabled)
+        ? enabled
+        : configuration.GetValue<bool>("CoinSpot:LiveTradingEnabled");
+}
+
+static decimal ReadJsonDecimal(System.Text.Json.JsonElement value) =>
+    value.ValueKind == System.Text.Json.JsonValueKind.String
+        ? decimal.Parse(value.GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+        : value.GetDecimal();

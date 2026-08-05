@@ -29,11 +29,15 @@ public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiS
     public Task<JsonDocument> GetSellQuoteAsync(string coin, decimal amount, string amountType, CancellationToken ct) =>
         PostPrivateAsync("/quote/sell/now", Fields(coin, amount, amountType), ct);
 
-    public Task<JsonDocument> BuyNowAsync(string coin, decimal amount, string amountType, CancellationToken ct) =>
-        PostPrivateAsync("/my/buy/now", Fields(coin, amount, amountType), ct);
+    public Task<JsonDocument> BuyNowAsync(
+        string coin, decimal amount, string amountType, decimal quotedRate, decimal threshold,
+        CancellationToken ct) =>
+        PostPrivateAsync("/my/buy/now", TradeFields(coin, amount, amountType, quotedRate, threshold), ct);
 
-    public Task<JsonDocument> SellNowAsync(string coin, decimal amount, string amountType, CancellationToken ct) =>
-        PostPrivateAsync("/my/sell/now", Fields(coin, amount, amountType), ct);
+    public Task<JsonDocument> SellNowAsync(
+        string coin, decimal amount, string amountType, decimal quotedRate, decimal threshold,
+        CancellationToken ct) =>
+        PostPrivateAsync("/my/sell/now", TradeFields(coin, amount, amountType, quotedRate, threshold), ct);
 
     public async Task<IReadOnlyList<WalletHolding>> GetBalancesAsync(CancellationToken cancellationToken)
     {
@@ -65,6 +69,17 @@ public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiS
             ["amount"] = amount.ToString(CultureInfo.InvariantCulture),
             ["amounttype"] = amountType
         };
+    }
+
+    private static Dictionary<string, string> TradeFields(
+        string coin, decimal amount, string amountType, decimal quotedRate, decimal threshold)
+    {
+        if (quotedRate <= 0) throw new ArgumentOutOfRangeException(nameof(quotedRate));
+        if (threshold is < 0 or > 1000) throw new ArgumentOutOfRangeException(nameof(threshold));
+        var fields = Fields(coin, amount, amountType);
+        fields["rate"] = quotedRate.ToString(CultureInfo.InvariantCulture);
+        fields["threshold"] = threshold.ToString(CultureInfo.InvariantCulture);
+        return fields;
     }
 
     private async Task<JsonDocument> PostPrivateAsync(

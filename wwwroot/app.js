@@ -14,6 +14,8 @@ let selectedStrategy = null;
 let entryPrice = null;
 let nextRefresh = null;
 let timer = null;
+let liveTradingStatus = { configured: false, enabled: false, ready: false };
+const liveTradeQuotes = { buy: null, sell: null };
 
 const aud = (n, digits = 4) => `$${Number(n).toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFractionDigits: digits });
@@ -21,6 +23,11 @@ const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFra
 $("analyse").addEventListener("click", analyse);
 $("coin").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
 $("amount").addEventListener("keydown", e => { if (e.key === "Enter") analyse(); });
+$("coin").addEventListener("input", syncLiveTradeCoin);
+$("liveBuyQuote").addEventListener("click", () => requestLiveTradeQuote("buy"));
+$("liveSellQuote").addEventListener("click", () => requestLiveTradeQuote("sell"));
+$("liveBuyExecute").addEventListener("click", () => executeLiveTrade("buy"));
+$("liveSellExecute").addEventListener("click", () => executeLiveTrade("sell"));
 $("pullbackPeriod").addEventListener("change", async () => {
   pullbackHover = null;
   if (!snapshot) return;
@@ -51,6 +58,136 @@ Object.entries(strategySelectors).forEach(([key, config]) => {
     select();
   });
 });
+
+function syncLiveTradeCoin() {
+  const coin = $("coin").value.trim().toUpperCase() || "COIN";
+  document.querySelectorAll(".tradeCoin").forEach(element => { element.textContent = coin; });
+  for (const side of ["buy", "sell"]) {
+    if (liveTradeQuotes[side] && liveTradeQuotes[side].coin !== coin) resetLiveTradeQuote(side);
+  }
+}
+
+function resetLiveTradeQuote(side) {
+  liveTradeQuotes[side] = null;
+  const prefix = side === "buy" ? "liveBuy" : "liveSell";
+  $(`${prefix}Execute`).disabled = true;
+  $(`${prefix}Result`).className = "trade-result";
+  $(`${prefix}Result`).textContent = liveTradingStatus.configured
+    ? "Request a fresh live quote before execution."
+    : "Configure a full-access API key to request a quote.";
+}
+
+async function loadLiveTradingStatus() {
+  const status = $("liveTradingStatus");
+  try {
+    const response = await fetch("/api/coinspot/trading/status", { cache: "no-store" });
+    const data = await readApiJson(response, "Trading status");
+    if (!response.ok) throw new Error(data.detail || data.error || "Trading status failed.");
+    liveTradingStatus = data;
+    $("liveBuyQuote").disabled = !data.configured;
+    $("liveSellQuote").disabled = !data.configured;
+    status.className = `trade-status ${data.ready ? "ready" : "blocked"}`;
+    status.textContent = data.ready
+      ? "LIVE EXECUTION ENABLED"
+      : data.configured
+        ? "QUOTE ONLY · EXECUTION DISABLED"
+        : "FULL-ACCESS API NOT CONFIGURED";
+    resetLiveTradeQuote("buy");
+    resetLiveTradeQuote("sell");
+  } catch (error) {
+    status.className = "trade-status blocked";
+    status.textContent = "TRADING STATUS UNAVAILABLE";
+    $("liveBuyResult").textContent = error.message;
+    $("liveSellResult").textContent = error.message;
+  }
+}
+
+async function requestLiveTradeQuote(side) {
+  const isBuy = side === "buy";
+  const prefix = isBuy ? "liveBuy" : "liveSell";
+  const coin = $("coin").value.trim().toUpperCase();
+  const amount = Number($(`${prefix}Amount`).value);
+  const amountType = isBuy ? "aud" : "coin";
+  const quoteButton = $(`${prefix}Quote`);
+  const executeButton = $(`${prefix}Execute`);
+  const result = $(`${prefix}Result`);
+  if (!/^[A-Z0-9]{2,10}$/.test(coin)) return showTradeFailure(result, "Enter a valid coin ticker first.");
+  if (!Number.isFinite(amount) || amount <= 0) return showTradeFailure(result, "Enter a positive trade amount.");
+
+  quoteButton.disabled = true;
+  executeButton.disabled = true;
+  result.className = "trade-result";
+  result.textContent = "Requesting a live CoinSpot quote…";
+  try {
+    const response = await fetch(`/api/coinspot/trading/${side}/quote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coin, amount, amountType })
+    });
+    const data = await readApiJson(response, `${side} quote`);
+    if (!response.ok) throw new Error(data.error || data.detail || `${side} quote failed.`);
+    liveTradeQuotes[side] = data;
+    const estimate = isBuy
+      ? `${number(amount / Number(data.rate), 8)} ${coin}`
+      : aud(amount * Number(data.rate), 2);
+    result.className = "trade-result success";
+    result.textContent = `Live rate ${aud(data.rate, Number(data.rate) < 1 ? 8 : 2)} · estimated ${estimate} · expires in 60 seconds.`;
+    executeButton.disabled = !liveTradingStatus.ready;
+  } catch (error) {
+    liveTradeQuotes[side] = null;
+    showTradeFailure(result, error.message);
+  } finally {
+    quoteButton.disabled = !liveTradingStatus.configured;
+  }
+}
+
+async function executeLiveTrade(side) {
+  const quote = liveTradeQuotes[side];
+  if (!quote || !liveTradingStatus.ready) return;
+  const isBuy = side === "buy";
+  const prefix = isBuy ? "liveBuy" : "liveSell";
+  const result = $(`${prefix}Result`);
+  const action = side.toUpperCase();
+  const amountDescription = isBuy
+    ? `${aud(quote.amount, 2)} of ${quote.coin}`
+    : `${number(quote.amount, 8)} ${quote.coin}`;
+  if (!window.confirm(`REAL COINSPOT ORDER\n\n${action} ${amountDescription}\n\nThis uses real funds and cannot be undone. Continue?`)) return;
+
+  $("liveBuyExecute").disabled = true;
+  $("liveSellExecute").disabled = true;
+  result.className = "trade-result";
+  result.textContent = `Submitting LIVE ${action} order…`;
+  try {
+    const response = await fetch(`/api/coinspot/trading/${side}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        coin: quote.coin,
+        amount: quote.amount,
+        amountType: quote.amountType,
+        quoteToken: quote.quoteToken,
+        confirmation: `LIVE ${action} ${quote.coin}`
+      })
+    });
+    const data = await readApiJson(response, `${side} execution`);
+    if (!response.ok) throw new Error(data.error || data.detail || `${side} execution failed.`);
+    const order = data.order || {};
+    result.className = "trade-result success";
+    result.textContent = `LIVE ${action} completed · ${number(order.amount ?? quote.amount, 8)} ${quote.coin} · total ${aud(order.total ?? 0, 2)}.`;
+    liveTradeQuotes[side] = null;
+    await loadWallet();
+  } catch (error) {
+    liveTradeQuotes[side] = null;
+    showTradeFailure(result, error.message);
+  } finally {
+    $(`${prefix}Quote`).disabled = !liveTradingStatus.configured;
+  }
+}
+
+function showTradeFailure(element, message) {
+  element.className = "trade-result failure";
+  element.textContent = message;
+}
 $("priceChart").addEventListener("mousemove", event => {
   if (!snapshot?.hourly?.length) return;
   const canvas = $("priceChart");
@@ -132,6 +269,7 @@ window.addEventListener("resize", () => {
 
 async function analyse(isAutomatic = false) {
   const coin = $("coin").value.trim().toUpperCase();
+  syncLiveTradeCoin();
   const amount = Number($("amount").value);
   if (!coin || !Number.isFinite(amount) || amount <= 0) return showError("Enter a coin ticker and a positive AUD amount.");
 
@@ -992,3 +1130,5 @@ function escapeHtml(value) { const node = document.createElement("span"); node.t
 analyse();
 loadGainers();
 loadWallet();
+syncLiveTradeCoin();
+loadLiveTradingStatus();

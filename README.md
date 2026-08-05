@@ -16,6 +16,18 @@ $env:COINSPOT_API_KEY = "your-new-key"
 $env:COINSPOT_API_SECRET = "your-new-secret"
 ```
 
+Live order execution is disabled by default. Quotes can be requested when the
+full-access credentials are configured. Enable execution only when you intend
+to trade real funds:
+
+```powershell
+$env:COINSPOT_LIVE_TRADING_ENABLED = "true"
+```
+
+The equivalent user-secret settings are `CoinSpot:ApiKey`,
+`CoinSpot:ApiSecret`, and `CoinSpot:LiveTradingEnabled`. Never store real
+credentials in committed `appsettings.json`.
+
 The wallet chart uses a separate CoinSpot **Read Only** API key. Create a
 read-only key in CoinSpot and set it for the current terminal before starting
 the app:
@@ -45,20 +57,12 @@ dotnet run
 Open the local URL shown by ASP.NET. Enter a coin ticker (TRX by default) and
 an AUD paper-investment amount. The responsive dashboard refreshes hourly and
 shows price and investment-value charts, trend metrics, the five entry gates,
-daily candles, stop level, and profit targets. It never places a trade.
+daily candles, stop level, profit targets, and two live CoinSpot trade panels.
 
-Review an instant quote before placing a live order:
-
-```powershell
-dotnet run -- quote-buy BTC 100 --amount-type aud
-dotnet run -- buy BTC 100 --amount-type aud --confirm-live
-
-dotnet run -- quote-sell BTC 0.001 --amount-type coin
-dotnet run -- sell BTC 0.001 --amount-type coin --confirm-live
-```
-
-Without `--confirm-live`, `buy` and `sell` are blocked. Instant orders cannot be
-cancelled after execution. Start with very small amounts.
+The Buy and Sell panels require a fresh 60-second quote followed by an explicit
+browser confirmation. Quote tokens are single-use, and execution applies a 1%
+rate threshold. Instant orders cannot be cancelled after execution. Start with
+very small amounts.
 
 ## Data and analysis
 
