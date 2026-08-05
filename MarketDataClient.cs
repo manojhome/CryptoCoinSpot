@@ -180,10 +180,20 @@ public sealed class MarketDataClient(HttpClient http)
             .Take(limit)
             .ToArray();
 
+        using var hourlyConcurrency = new SemaphoreSlim(8);
         var oneHourChanges = await Task.WhenAll(topGainers.Select(async candidate =>
         {
-            var change = await GetCoinSpotOneHourChangeAsync(candidate.Coin, cancellationToken);
-            return (candidate.Coin, Change: change);
+            await hourlyConcurrency.WaitAsync(cancellationToken);
+            try
+            {
+                var change = await GetCoinSpotOneHourChangeAsync(candidate.Coin, cancellationToken)
+                    ?? await GetKuCoinOneHourChangeAsync(candidate.Coin, cancellationToken);
+                return (candidate.Coin, Change: change);
+            }
+            finally
+            {
+                hourlyConcurrency.Release();
+            }
         }));
         var oneHourByCoin = oneHourChanges.ToDictionary(
             x => x.Coin, x => x.Change, StringComparer.OrdinalIgnoreCase);
@@ -245,6 +255,45 @@ public sealed class MarketDataClient(HttpClient http)
             return null;
         }
         catch (HttpRequestException)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<decimal?> GetKuCoinOneHourChangeAsync(
+        string coin, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var candles = await GetKuCoinCandlesAsync(
+                coin, "1min", now.AddMinutes(-70), "USDT", cancellationToken);
+            if (candles.Count < 2) return null;
+
+            var target = now.AddHours(-1);
+            var baseline = candles
+                .Where(x => x.Time <= target && x.Close > 0)
+                .OrderByDescending(x => x.Time)
+                .Select(x => x.Close)
+                .FirstOrDefault();
+            var currentPrice = candles[^1].Close;
+            return baseline > 0 && currentPrice > 0
+                ? (currentPrice - baseline) / baseline * 100m
+                : null;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
         {
             return null;
         }

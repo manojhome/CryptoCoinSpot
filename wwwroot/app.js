@@ -690,7 +690,7 @@ function drawGainers(items) {
   ctx.fillText("COIN", 36, 12);
   ctx.textAlign = "right";
   ctx.fillText("24H", width - 164, 12);
-  ctx.fillText("1H COINSPOT", width - 83, 12);
+  ctx.fillText("1H MOVE", width - 83, 12);
   ctx.fillText("PRICE", width - 4, 12);
   ctx.strokeStyle = "rgba(100,115,110,.2)";
   ctx.beginPath(); ctx.moveTo(0, headerHeight - 1); ctx.lineTo(width, headerHeight - 1); ctx.stroke();
