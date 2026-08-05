@@ -75,9 +75,18 @@
         <article class="live-trade-card sell-card">
           <p class="label">SELL NOW</p>
           <h3>Sell <span class="tradeCoin">TRX</span> for AUD</h3>
+          <div class="sell-wallet-summary">
+            <div><span>Wallet amount</span><strong id="liveSellHoldingAmount">—</strong></div>
+            <div><span>Current AUD worth</span><strong id="liveSellHoldingAud">—</strong></div>
+          </div>
           <label>Coin amount to sell
             <input id="liveSellAmount" type="number" min="0.00000001" step="0.00000001" value="0.001">
           </label>
+          <div class="sell-input-divider"><span>OR</span></div>
+          <label>AUD amount to sell
+            <div class="trade-money-input"><span>$</span><input id="liveSellAudAmount" type="number" min="0.01" step="1" placeholder="Enter AUD value"></div>
+          </label>
+          <small id="liveSellMode" class="sell-mode">Selling by coin amount</small>
           <div class="trade-actions">
             <button id="liveSellQuote" type="button" disabled>Get sell quote</button>
             <button id="liveSellExecute" class="execute-button" type="button" disabled>Confirm live sell</button>

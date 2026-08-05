@@ -58,6 +58,14 @@ button span { margin-left: 18px; }
 .live-trade-card h3 { margin: 0 0 16px; font-size: 19px; }
 .live-trade-card label { color: var(--muted); }
 .live-trade-card input { color: var(--ink); background: var(--card); border-color: var(--line); }
+.sell-wallet-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -3px 0 14px; }
+.sell-wallet-summary > div { padding: 11px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; }
+.sell-wallet-summary span, .sell-wallet-summary strong { display: block; }
+.sell-wallet-summary span { color: var(--muted); font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; }
+.sell-wallet-summary strong { margin-top: 5px; color: var(--ink); font: 800 14px/1.2 ui-monospace, Consolas, monospace; }
+.sell-input-divider { display: flex; align-items: center; gap: 8px; margin: 9px 0; color: var(--muted); font: 750 9px/1 ui-monospace, Consolas, monospace; }
+.sell-input-divider::before, .sell-input-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.sell-mode { display: block; margin-top: 7px; color: var(--amber); font: 700 10px/1.3 ui-monospace, Consolas, monospace; }
 .trade-money-input { position: relative; }
 .trade-money-input span { position: absolute; left: 15px; top: 15px; z-index: 1; color: var(--green-dark); font-weight: 850; }
 .trade-money-input input { padding-left: 40px; }

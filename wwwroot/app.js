@@ -16,6 +16,7 @@ let nextRefresh = null;
 let timer = null;
 let liveTradingStatus = { configured: false, enabled: false, ready: false };
 const liveTradeQuotes = { buy: null, sell: null };
+let liveSellAmountType = "coin";
 
 const aud = (n, digits = 4) => `$${Number(n).toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const number = (n, digits = 4) => Number(n).toLocaleString("en-AU", { maximumFractionDigits: digits });
@@ -28,6 +29,8 @@ $("liveBuyQuote").addEventListener("click", () => requestLiveTradeQuote("buy"));
 $("liveSellQuote").addEventListener("click", () => requestLiveTradeQuote("sell"));
 $("liveBuyExecute").addEventListener("click", () => executeLiveTrade("buy"));
 $("liveSellExecute").addEventListener("click", () => executeLiveTrade("sell"));
+$("liveSellAmount").addEventListener("input", () => selectSellAmountType("coin"));
+$("liveSellAudAmount").addEventListener("input", () => selectSellAmountType("aud"));
 $("pullbackPeriod").addEventListener("change", async () => {
   pullbackHover = null;
   if (!snapshot) return;
@@ -65,6 +68,28 @@ function syncLiveTradeCoin() {
   for (const side of ["buy", "sell"]) {
     if (liveTradeQuotes[side] && liveTradeQuotes[side].coin !== coin) resetLiveTradeQuote(side);
   }
+  updateSellWalletSummary();
+}
+
+function selectSellAmountType(amountType) {
+  liveSellAmountType = amountType;
+  if (amountType === "coin" && $("liveSellAmount").value.trim()) $("liveSellAudAmount").value = "";
+  if (amountType === "aud" && $("liveSellAudAmount").value.trim()) $("liveSellAmount").value = "";
+  $("liveSellMode").textContent = amountType === "aud"
+    ? "Selling the coin amount equivalent to the entered AUD value"
+    : "Selling by coin amount";
+  resetLiveTradeQuote("sell");
+}
+
+function updateSellWalletSummary() {
+  const coin = $("coin").value.trim().toUpperCase();
+  const holding = walletSnapshot?.find(item => item.coin === coin);
+  $("liveSellHoldingAmount").textContent = holding
+    ? `${number(holding.balance, 8)} ${coin}`
+    : walletSnapshot ? `0 ${coin || "COIN"}` : "Wallet unavailable";
+  $("liveSellHoldingAud").textContent = holding
+    ? aud(holding.audBalance, 2)
+    : walletSnapshot ? aud(0, 2) : "Wallet unavailable";
 }
 
 function resetLiveTradeQuote(side) {
@@ -106,13 +131,22 @@ async function requestLiveTradeQuote(side) {
   const isBuy = side === "buy";
   const prefix = isBuy ? "liveBuy" : "liveSell";
   const coin = $("coin").value.trim().toUpperCase();
-  const amount = Number($(`${prefix}Amount`).value);
-  const amountType = isBuy ? "aud" : "coin";
+  const amountType = isBuy ? "aud" : liveSellAmountType;
+  const amountInput = !isBuy && amountType === "aud" ? $("liveSellAudAmount") : $(`${prefix}Amount`);
+  const amount = Number(amountInput.value);
   const quoteButton = $(`${prefix}Quote`);
   const executeButton = $(`${prefix}Execute`);
   const result = $(`${prefix}Result`);
   if (!/^[A-Z0-9]{2,10}$/.test(coin)) return showTradeFailure(result, "Enter a valid coin ticker first.");
   if (!Number.isFinite(amount) || amount <= 0) return showTradeFailure(result, "Enter a positive trade amount.");
+  if (!isBuy && walletSnapshot) {
+    const holding = walletSnapshot.find(item => item.coin === coin);
+    if (!holding) return showTradeFailure(result, `Your CoinSpot wallet has no ${coin} available to sell.`);
+    if (amountType === "coin" && amount > Number(holding.balance))
+      return showTradeFailure(result, `Coin amount exceeds your ${number(holding.balance, 8)} ${coin} wallet balance.`);
+    if (amountType === "aud" && amount > Number(holding.audBalance))
+      return showTradeFailure(result, `AUD amount exceeds the current ${aud(holding.audBalance, 2)} wallet value.`);
+  }
 
   quoteButton.disabled = true;
   executeButton.disabled = true;
@@ -129,7 +163,9 @@ async function requestLiveTradeQuote(side) {
     liveTradeQuotes[side] = data;
     const estimate = isBuy
       ? `${number(amount / Number(data.rate), 8)} ${coin}`
-      : aud(amount * Number(data.rate), 2);
+      : amountType === "aud"
+        ? `${number(amount / Number(data.rate), 8)} ${coin} for ${aud(amount, 2)}`
+        : aud(amount * Number(data.rate), 2);
     result.className = "trade-result success";
     result.textContent = `Live rate ${aud(data.rate, Number(data.rate) < 1 ? 8 : 2)} · estimated ${estimate} · expires in 60 seconds.`;
     executeButton.disabled = !liveTradingStatus.ready;
@@ -150,7 +186,9 @@ async function executeLiveTrade(side) {
   const action = side.toUpperCase();
   const amountDescription = isBuy
     ? `${aud(quote.amount, 2)} of ${quote.coin}`
-    : `${number(quote.amount, 8)} ${quote.coin}`;
+    : quote.amountType === "aud"
+      ? `${aud(quote.amount, 2)} worth of ${quote.coin}`
+      : `${number(quote.amount, 8)} ${quote.coin}`;
   if (!window.confirm(`REAL COINSPOT ORDER\n\n${action} ${amountDescription}\n\nThis uses real funds and cannot be undone. Continue?`)) return;
 
   $("liveBuyExecute").disabled = true;
@@ -869,8 +907,11 @@ async function loadWallet() {
     if (!response.ok) throw new Error(data.detail || "Wallet update failed.");
     walletSnapshot = data.items;
     drawWallet(data.items);
+    updateSellWalletSummary();
     $("walletStatus").textContent = `${data.items.length} coins · ${aud(data.totalAud, 2)}`;
   } catch (error) {
+    walletSnapshot = null;
+    updateSellWalletSummary();
     $("walletStatus").textContent = error.message.includes("COINSPOT_READ_ONLY")
       ? "Read-only API not configured"
       : `Unavailable: ${error.message}`;
