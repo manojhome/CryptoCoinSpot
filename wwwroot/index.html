@@ -109,14 +109,6 @@
         <p id="explanation" class="explanation">—</p>
       </div>
 
-      <div class="metrics">
-        <article><p>Current price</p><strong id="currentPrice">—</strong><small id="currentPriceSource">AUD market price</small><small id="currentPriceRetrieved" class="price-retrieved">Waiting for price</small></article>
-        <article><p>Paper units</p><strong id="units">—</strong><small id="unitCoin">coins</small></article>
-        <article><p>Current value</p><strong id="currentValue">—</strong><small id="valueChange">entry snapshot</small></article>
-        <article><p>Hourly trend</p><strong id="trend">—</strong><small id="trendMeta">—</small></article>
-        <article><p>Daily trend</p><strong id="dailyTrend">—</strong><small id="dailyTrendMeta">—</small></article>
-      </div>
-
       <div class="charts">
         <article class="chart-card">
           <div class="card-head"><div><p class="label">MARKET</p><h2>96-hour price</h2></div><span id="priceRange">—</span></div>
@@ -170,6 +162,21 @@
           <div class="table-wrap">
             <table><thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>High − Low <small id="dailyRangeAverage">Avg —</small></th><th>Close</th><th>Change %</th></tr></thead><tbody id="dailyRows"></tbody></table>
           </div>
+        </article>
+      </div>
+
+      <div class="metrics timeline-metrics" aria-label="Current price and trend refresh controls">
+        <article>
+          <div class="metric-heading"><p>Current price</p><button id="refreshCurrentPrice" class="metric-refresh" type="button" disabled>↻ Refresh</button></div>
+          <strong id="currentPrice">—</strong><small id="currentPriceSource">AUD market price</small><small id="currentPriceRetrieved" class="price-retrieved">Waiting for price</small>
+        </article>
+        <article>
+          <div class="metric-heading"><p>Hourly trend</p><button id="refreshHourlyTrend" class="metric-refresh" type="button">↻ Refresh</button></div>
+          <strong id="trend">—</strong><small id="trendMeta">—</small>
+        </article>
+        <article>
+          <div class="metric-heading"><p>Daily trend</p><button id="refreshDailyTrend" class="metric-refresh" type="button">↻ Refresh</button></div>
+          <strong id="dailyTrend">—</strong><small id="dailyTrendMeta">—</small>
         </article>
       </div>
 

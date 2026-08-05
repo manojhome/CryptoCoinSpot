@@ -58,6 +58,12 @@ Open the local URL shown by ASP.NET. Enter a coin ticker (TRX by default) and
 an AUD paper-investment amount. The responsive dashboard refreshes hourly and
 shows price and investment-value charts, trend metrics, the five entry gates,
 daily candles, stop level, profit targets, and two live CoinSpot trade panels.
+Immediately above TimelineData, three refreshable cards show Current Price,
+Hourly Trend, and Daily Trend. Current Price automatically requests a CoinSpot
+sell quote and can be re-quoted on demand; it turns green when the quote rises
+from the previously displayed price and red when it falls. Hourly and daily
+refreshes update their own trend calculations without replacing that sell-quote
+price. The former Paper Units and Current Value cards are no longer displayed.
 
 The Buy and Sell panels require a fresh 60-second quote followed by an explicit
 browser confirmation. Quote tokens are single-use, and execution applies a 1%

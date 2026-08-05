@@ -107,10 +107,15 @@ button span { margin-left: 18px; }
 .signal { margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -.03em; }
 .signal.buy { color: var(--green-dark); }
 .explanation { margin: 0; color: var(--muted); line-height: 1.55; }
-.metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin: 14px 0; }
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 14px 0; }
+.timeline-metrics { margin-bottom: 0; }
 .metrics article, .chart-card, .rule-card, .plan-card, .daily-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
 .metrics article { padding: 20px; }
 .metrics p { margin: 0 0 14px; color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
+.metric-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.metric-heading p { margin-bottom: 14px; }
+.metric-refresh { width: auto; height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--green-dark); font-size: 9px; white-space: nowrap; }
+.metric-refresh:hover { background: rgba(200,240,108,.35); }
 .metrics strong { display: block; font-size: clamp(21px, 2.5vw, 34px); line-height: 1; letter-spacing: -.04em; }
 .metrics strong.trend-up { color: var(--green-dark); }
 .metrics strong.trend-down { color: var(--red); }

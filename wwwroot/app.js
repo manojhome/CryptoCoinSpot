@@ -12,6 +12,8 @@ let pullbackCandles = [];
 let strategySimulations = null;
 let selectedStrategy = null;
 let entryPrice = null;
+let currentMetricPrice = null;
+let currentQuoteRefreshInFlight = false;
 let nextRefresh = null;
 let timer = null;
 let liveTradingStatus = { configured: false, enabled: false, ready: false };
@@ -35,6 +37,9 @@ $("liveSellExecute").addEventListener("click", () => executeLiveTrade("sell"));
 $("liveSellAuto").addEventListener("click", autoSellNow);
 $("liveSellAmount").addEventListener("input", () => selectSellAmountType("coin"));
 $("liveSellAudAmount").addEventListener("input", () => selectSellAmountType("aud"));
+$("refreshCurrentPrice").addEventListener("click", refreshCurrentSellQuotePrice);
+$("refreshHourlyTrend").addEventListener("click", () => refreshTrendMetric("hourly"));
+$("refreshDailyTrend").addEventListener("click", () => refreshTrendMetric("daily"));
 $("pullbackPeriod").addEventListener("change", async () => {
   pullbackHover = null;
   if (!snapshot) return;
@@ -116,6 +121,7 @@ async function loadLiveTradingStatus() {
     $("liveBuyQuote").disabled = !data.configured;
     $("liveSellQuote").disabled = !data.configured;
     $("liveSellAuto").disabled = !data.ready;
+    $("refreshCurrentPrice").disabled = !data.configured;
     status.className = `trade-status ${data.ready ? "ready" : "blocked"}`;
     status.textContent = data.ready
       ? "LIVE EXECUTION ENABLED"
@@ -125,12 +131,14 @@ async function loadLiveTradingStatus() {
     resetLiveTradeQuote("buy");
     resetLiveTradeQuote("sell");
     drawLiveTransactions();
+    if (data.configured && snapshot) refreshCurrentSellQuotePrice();
   } catch (error) {
     status.className = "trade-status blocked";
     status.textContent = "TRADING STATUS UNAVAILABLE";
     $("liveBuyResult").textContent = error.message;
     $("liveSellResult").textContent = error.message;
     $("liveSellAuto").disabled = true;
+    $("refreshCurrentPrice").disabled = true;
     drawLiveTransactions();
   }
 }
@@ -701,6 +709,7 @@ async function analyse(isAutomatic = false) {
 
 function clearMarketSections() {
   snapshot = null;
+  currentMetricPrice = null;
   pullbackMarkers = null;
   pullbackCandles = [];
   dailyPercentData = [];
@@ -719,6 +728,7 @@ function clearMarketSections() {
   $("dailyTrendMeta").textContent = "Unavailable";
   $("currentPriceRetrieved").textContent = "Price unavailable";
   $("currentPriceSource").textContent = "AUD market price";
+  $("currentPrice").className = "trend-neutral";
   $("dailyRows").innerHTML = "";
   $("pullbackChartRange").textContent = "Unavailable";
   $("sellTimingConfidence").textContent = "Hourly data unavailable";
@@ -765,19 +775,16 @@ function clearMarketSections() {
   $("explanation").textContent = "Market data is temporarily unavailable. Wallet and gainers can still refresh independently.";
 }
 
-function render(data) {
-  const units = data.amount / entryPrice;
-  const currentValue = units * data.currentPrice;
-  const change = (currentValue / data.amount - 1) * 100;
-  $("dashboard").hidden = false;
-  if (gainersSnapshot) drawGainers(gainersSnapshot);
-  if (walletSnapshot) drawWallet(walletSnapshot);
-  $("signal").textContent = data.signal.action;
-  $("signal").className = `signal ${data.signal.action.startsWith("BUY") ? "buy" : ""}`;
-  $("explanation").textContent = data.signal.explanation;
-  $("currentPrice").textContent = aud(data.currentPrice, 6);
-  $("currentPriceSource").textContent = data.currentPriceSource;
-  const priceRetrievedAt = new Date(data.currentPriceRetrievedAt || data.refreshedAt).toLocaleString("en-AU", {
+function renderCurrentPriceMetric(price, source, retrievedAt, direction = "neutral") {
+  const value = Number(price);
+  $("currentPrice").textContent = aud(value, value < 1 ? 8 : 2);
+  $("currentPrice").className = direction === "up"
+    ? "trend-up"
+    : direction === "down"
+      ? "trend-down"
+      : "trend-neutral";
+  $("currentPriceSource").textContent = source;
+  const retrieved = new Date(retrievedAt || Date.now()).toLocaleString("en-AU", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -785,40 +792,130 @@ function render(data) {
     minute: "2-digit",
     second: "2-digit"
   });
-  $("currentPriceRetrieved").textContent = `Retrieved ${priceRetrievedAt}`;
-  $("units").textContent = number(units, 6);
-  $("unitCoin").textContent = `${data.coin} at ${aud(entryPrice, 6)} entry`;
-  $("currentValue").textContent = aud(currentValue, 2);
-  $("valueChange").textContent = `${change >= 0 ? "+" : ""}${change.toFixed(2)}% from snapshot`;
-  const previousDailyClose = Number(data.daily.at(-1).close);
-  const dailyMove = (Number(data.currentPrice) / previousDailyClose - 1) * 100;
-  $("trend").textContent = data.trend.trend;
-  const trendDirection = data.trend.trend.toUpperCase();
-  $("trend").className = trendDirection.includes("UP")
+  $("currentPriceRetrieved").textContent = `Retrieved ${retrieved}`;
+}
+
+function renderHourlyTrendMetric(trend) {
+  $("trend").textContent = trend.trend;
+  const direction = trend.trend.toUpperCase();
+  $("trend").className = direction.includes("UP")
     ? "trend-up"
-    : trendDirection.includes("DOWN")
+    : direction.includes("DOWN")
       ? "trend-down"
       : "trend-neutral";
-  const hourlyPercentage = document.createElement("span");
-  hourlyPercentage.className = "trend-percentage";
-  hourlyPercentage.textContent = `${data.trend.change24HoursPercent >= 0 ? "+" : ""}${Number(data.trend.change24HoursPercent).toFixed(2)}%`;
+  const percentage = document.createElement("span");
+  percentage.className = "trend-percentage";
+  percentage.textContent = `${Number(trend.change24HoursPercent) >= 0 ? "+" : ""}${Number(trend.change24HoursPercent).toFixed(2)}%`;
   $("trendMeta").replaceChildren(
     document.createTextNode("24h "),
-    hourlyPercentage,
-    document.createTextNode(` · RSI ${Number(data.trend.rsi14).toFixed(1)}`));
-  const dailyDirection = dailyMove > 0 ? "UP" : dailyMove < 0 ? "DOWN" : "FLAT";
-  $("dailyTrend").textContent = dailyDirection;
+    percentage,
+    document.createTextNode(` · RSI ${Number(trend.rsi14).toFixed(1)}`));
+}
+
+function renderDailyTrendMetric(daily, price) {
+  const previousDailyClose = Number(daily.at(-1).close);
+  const dailyMove = (Number(price) / previousDailyClose - 1) * 100;
+  const direction = dailyMove > 0 ? "UP" : dailyMove < 0 ? "DOWN" : "FLAT";
+  $("dailyTrend").textContent = direction;
   $("dailyTrend").className = dailyMove > 0
     ? "trend-up"
     : dailyMove < 0
       ? "trend-down"
       : "trend-neutral";
-  const dailyPercentage = document.createElement("span");
-  dailyPercentage.className = "trend-percentage";
-  dailyPercentage.textContent = `${dailyMove >= 0 ? "+" : ""}${dailyMove.toFixed(2)}%`;
+  const percentage = document.createElement("span");
+  percentage.className = "trend-percentage";
+  percentage.textContent = `${dailyMove >= 0 ? "+" : ""}${dailyMove.toFixed(2)}%`;
   $("dailyTrendMeta").replaceChildren(
-    dailyPercentage,
+    percentage,
     document.createTextNode(` today · previous close ${aud(previousDailyClose, 6)}`));
+  return dailyMove;
+}
+
+async function refreshCurrentSellQuotePrice() {
+  if (currentQuoteRefreshInFlight) return;
+  const button = $("refreshCurrentPrice");
+  const coin = $("coin").value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,10}$/.test(coin)) return;
+  const previousPrice = currentMetricPrice;
+  const holding = walletSnapshot?.find(item => item.coin === coin);
+  const hasHolding = Number(holding?.balance) > 0;
+  const amount = hasHolding ? Number(holding.balance) : 10;
+  const amountType = hasHolding ? "coin" : "aud";
+  currentQuoteRefreshInFlight = true;
+  button.disabled = true;
+  button.textContent = "Refreshing…";
+  $("currentPriceRetrieved").textContent = "Requesting live CoinSpot sell quote…";
+  try {
+    const response = await fetch("/api/coinspot/trading/sell/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coin, amount, amountType })
+    });
+    const quote = await readApiJson(response, "Current sell quote");
+    if (!response.ok) throw new Error(quote.error || quote.detail || "Current sell quote failed.");
+    const quotePrice = Number(quote.rate);
+    const direction = Number.isFinite(previousPrice)
+      ? quotePrice > previousPrice ? "up" : quotePrice < previousPrice ? "down" : "neutral"
+      : "neutral";
+    currentMetricPrice = quotePrice;
+    const quoteBasis = amountType === "coin"
+      ? `${number(quote.amount, 8)} ${coin} wallet quote`
+      : `${aud(quote.amount, 2)} reference quote`;
+    renderCurrentPriceMetric(quotePrice, `Live CoinSpot sell quote · ${quoteBasis}`, Date.now(), direction);
+    if (snapshot?.daily?.length) renderDailyTrendMetric(snapshot.daily, quotePrice);
+    if (snapshot?.hourly?.length) renderHourlySellTiming(snapshot.hourly, quotePrice);
+  } catch (error) {
+    $("currentPriceRetrieved").textContent = `Quote unavailable: ${error.message}`;
+  } finally {
+    button.textContent = "↻ Refresh";
+    button.disabled = !liveTradingStatus.configured;
+    currentQuoteRefreshInFlight = false;
+  }
+}
+
+async function refreshTrendMetric(section) {
+  const button = section === "hourly" ? $("refreshHourlyTrend") : $("refreshDailyTrend");
+  const targetMeta = section === "hourly" ? $("trendMeta") : $("dailyTrendMeta");
+  const coin = $("coin").value.trim().toUpperCase();
+  const amount = Number($("amount").value);
+  if (!/^[A-Z0-9]{2,10}$/.test(coin) || !Number.isFinite(amount) || amount <= 0) return;
+  button.disabled = true;
+  button.textContent = "Refreshing…";
+  try {
+    const response = await fetch(`/api/dashboard?coin=${encodeURIComponent(coin)}&amount=${encodeURIComponent(amount)}`, { cache: "no-store" });
+    const data = await readApiJson(response, `${section} trend refresh`);
+    if (!response.ok) throw new Error(data.error || data.detail || `${section} trend refresh failed.`);
+    if (section === "hourly") {
+      snapshot = { ...snapshot, hourly: data.hourly, trend: data.trend };
+      renderHourlyTrendMetric(data.trend);
+      const prices = data.hourly.map(item => Number(item.price));
+      drawPriceCandles($("priceChart"), data.hourly, priceHover);
+      $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
+      renderHourlySellTiming(data.hourly, currentMetricPrice ?? Number(data.currentPrice));
+    } else {
+      snapshot = { ...snapshot, daily: data.daily };
+      renderDailyTrendMetric(data.daily, currentMetricPrice ?? Number(data.currentPrice));
+    }
+  } catch (error) {
+    targetMeta.textContent = `Refresh failed: ${error.message}`;
+  } finally {
+    button.textContent = "↻ Refresh";
+    button.disabled = false;
+  }
+}
+
+function render(data) {
+  $("dashboard").hidden = false;
+  if (gainersSnapshot) drawGainers(gainersSnapshot);
+  if (walletSnapshot) drawWallet(walletSnapshot);
+  $("signal").textContent = data.signal.action;
+  $("signal").className = `signal ${data.signal.action.startsWith("BUY") ? "buy" : ""}`;
+  $("explanation").textContent = data.signal.explanation;
+  currentMetricPrice = Number(data.currentPrice);
+  renderCurrentPriceMetric(currentMetricPrice, data.currentPriceSource, data.currentPriceRetrievedAt || data.refreshedAt);
+  if (liveTradingStatus.configured) refreshCurrentSellQuotePrice();
+  renderHourlyTrendMetric(data.trend);
+  const dailyMove = renderDailyTrendMetric(data.daily, currentMetricPrice);
 
   const checks = [
     [data.signal.isAboveMovingAverage, `Above 20-day average (${aud(data.signal.movingAverage20, 6)})`],
