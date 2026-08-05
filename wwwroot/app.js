@@ -29,6 +29,7 @@ $("liveBuyQuote").addEventListener("click", () => requestLiveTradeQuote("buy"));
 $("liveSellQuote").addEventListener("click", () => requestLiveTradeQuote("sell"));
 $("liveBuyExecute").addEventListener("click", () => executeLiveTrade("buy"));
 $("liveSellExecute").addEventListener("click", () => executeLiveTrade("sell"));
+$("liveSellAuto").addEventListener("click", autoSellNow);
 $("liveSellAmount").addEventListener("input", () => selectSellAmountType("coin"));
 $("liveSellAudAmount").addEventListener("input", () => selectSellAmountType("aud"));
 $("pullbackPeriod").addEventListener("change", async () => {
@@ -111,6 +112,7 @@ async function loadLiveTradingStatus() {
     liveTradingStatus = data;
     $("liveBuyQuote").disabled = !data.configured;
     $("liveSellQuote").disabled = !data.configured;
+    $("liveSellAuto").disabled = !data.ready;
     status.className = `trade-status ${data.ready ? "ready" : "blocked"}`;
     status.textContent = data.ready
       ? "LIVE EXECUTION ENABLED"
@@ -124,10 +126,11 @@ async function loadLiveTradingStatus() {
     status.textContent = "TRADING STATUS UNAVAILABLE";
     $("liveBuyResult").textContent = error.message;
     $("liveSellResult").textContent = error.message;
+    $("liveSellAuto").disabled = true;
   }
 }
 
-async function requestLiveTradeQuote(side) {
+async function requestLiveTradeQuote(side, keepAutoSellDisabled = false) {
   const isBuy = side === "buy";
   const prefix = isBuy ? "liveBuy" : "liveSell";
   const coin = $("coin").value.trim().toUpperCase();
@@ -137,19 +140,22 @@ async function requestLiveTradeQuote(side) {
   const quoteButton = $(`${prefix}Quote`);
   const executeButton = $(`${prefix}Execute`);
   const result = $(`${prefix}Result`);
-  if (!/^[A-Z0-9]{2,10}$/.test(coin)) return showTradeFailure(result, "Enter a valid coin ticker first.");
-  if (!Number.isFinite(amount) || amount <= 0) return showTradeFailure(result, "Enter a positive trade amount.");
+  if (!/^[A-Z0-9]{2,10}$/.test(coin)) { showTradeFailure(result, "Enter a valid coin ticker first."); return null; }
+  if (!Number.isFinite(amount) || amount <= 0) { showTradeFailure(result, "Enter a positive trade amount."); return null; }
   if (!isBuy && walletSnapshot) {
     const holding = walletSnapshot.find(item => item.coin === coin);
-    if (!holding) return showTradeFailure(result, `Your CoinSpot wallet has no ${coin} available to sell.`);
-    if (amountType === "coin" && amount > Number(holding.balance))
-      return showTradeFailure(result, `Coin amount exceeds your ${number(holding.balance, 8)} ${coin} wallet balance.`);
-    if (amountType === "aud" && amount > Number(holding.audBalance))
-      return showTradeFailure(result, `AUD amount exceeds the current ${aud(holding.audBalance, 2)} wallet value.`);
+    if (!holding) { showTradeFailure(result, `Your CoinSpot wallet has no ${coin} available to sell.`); return null; }
+    if (amountType === "coin" && amount > Number(holding.balance)) {
+      showTradeFailure(result, `Coin amount exceeds your ${number(holding.balance, 8)} ${coin} wallet balance.`); return null;
+    }
+    if (amountType === "aud" && amount > Number(holding.audBalance)) {
+      showTradeFailure(result, `AUD amount exceeds the current ${aud(holding.audBalance, 2)} wallet value.`); return null;
+    }
   }
 
   quoteButton.disabled = true;
   executeButton.disabled = true;
+  if (!isBuy) $("liveSellAuto").disabled = true;
   result.className = "trade-result";
   result.textContent = "Requesting a live CoinSpot quote…";
   try {
@@ -169,15 +175,18 @@ async function requestLiveTradeQuote(side) {
     result.className = "trade-result success";
     result.textContent = `Live rate ${aud(data.rate, Number(data.rate) < 1 ? 8 : 2)} · estimated ${estimate} · expires in 60 seconds.`;
     executeButton.disabled = !liveTradingStatus.ready;
+    return data;
   } catch (error) {
     liveTradeQuotes[side] = null;
     showTradeFailure(result, error.message);
+    return null;
   } finally {
     quoteButton.disabled = !liveTradingStatus.configured;
+    if (!isBuy && !keepAutoSellDisabled) $("liveSellAuto").disabled = !liveTradingStatus.ready;
   }
 }
 
-async function executeLiveTrade(side) {
+async function executeLiveTrade(side, skipConfirmation = false) {
   const quote = liveTradeQuotes[side];
   if (!quote || !liveTradingStatus.ready) return;
   const isBuy = side === "buy";
@@ -189,10 +198,11 @@ async function executeLiveTrade(side) {
     : quote.amountType === "aud"
       ? `${aud(quote.amount, 2)} worth of ${quote.coin}`
       : `${number(quote.amount, 8)} ${quote.coin}`;
-  if (!window.confirm(`REAL COINSPOT ORDER\n\n${action} ${amountDescription}\n\nThis uses real funds and cannot be undone. Continue?`)) return;
+  if (!skipConfirmation && !window.confirm(`REAL COINSPOT ORDER\n\n${action} ${amountDescription}\n\nThis uses real funds and cannot be undone. Continue?`)) return;
 
   $("liveBuyExecute").disabled = true;
   $("liveSellExecute").disabled = true;
+  if (!isBuy) $("liveSellAuto").disabled = true;
   result.className = "trade-result";
   result.textContent = `Submitting LIVE ${action} order…`;
   try {
@@ -219,7 +229,19 @@ async function executeLiveTrade(side) {
     showTradeFailure(result, error.message);
   } finally {
     $(`${prefix}Quote`).disabled = !liveTradingStatus.configured;
+    if (!isBuy) $("liveSellAuto").disabled = !liveTradingStatus.ready;
   }
+}
+
+async function autoSellNow() {
+  if (!liveTradingStatus.ready) return;
+  $("liveSellAuto").disabled = true;
+  const quote = await requestLiveTradeQuote("sell", true);
+  if (!quote) {
+    $("liveSellAuto").disabled = !liveTradingStatus.ready;
+    return;
+  }
+  await executeLiveTrade("sell", true);
 }
 
 function showTradeFailure(element, message) {

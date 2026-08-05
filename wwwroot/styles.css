@@ -73,6 +73,9 @@ button span { margin-left: 18px; }
 .trade-actions button { height: 44px; padding: 0 12px; font-size: 13px; }
 .sell-card .trade-actions button:first-child { color: white; background: var(--red); }
 .execute-button { color: white; background: var(--ink); }
+.autosell-button { grid-column: 1 / -1; color: white; background: #a92525; border: 2px solid #791919; }
+.autosell-button:hover { background: #8f1f1f; }
+.autosell-warning { display: block; margin-top: 8px; color: var(--red); font: 750 10px/1.4 ui-monospace, Consolas, monospace; }
 .trade-result { display: block; min-height: 38px; margin-top: 12px; color: var(--muted); font: 650 11px/1.5 ui-monospace, Consolas, monospace; }
 .trade-result.success { color: var(--green-dark); }
 .trade-result.failure { color: var(--red); }

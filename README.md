@@ -64,6 +64,11 @@ browser confirmation. Quote tokens are single-use, and execution applies a 1%
 rate threshold. Instant orders cannot be cancelled after execution. Start with
 very small amounts.
 
+The Sell panel also includes an **AutoSell now** action. It obtains a fresh quote
+and immediately submits the real sell order without a confirmation prompt. The
+same balance checks, single-use token, live-trading setting, and 1% rate threshold
+still apply.
+
 ## Data and analysis
 
 CoinSpot's public API exposes current prices and only recent completed orders,
