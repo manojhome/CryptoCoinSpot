@@ -112,4 +112,7 @@ Every successful live Buy, Sell, or AutoSell submitted by this app is appended
 to `Data/live-trades.json`. The transaction container uses weighted-average cost
 for realized sell P/L and the current wallet rate for unrealized P/L. Sells made
 against coins acquired outside this app show `N/A` until a recorded buy cost is
-available. The ledger is local runtime data and is excluded from Git.
+available. Each new entry stores an estimated fee using CoinSpot's current 1%
+Instant Buy/Sell rate; older entries calculate the same estimate when displayed.
+P/L is based on CoinSpot's returned totals, so the displayed fee is not deducted
+again. The ledger is local runtime data and is excluded from Git.

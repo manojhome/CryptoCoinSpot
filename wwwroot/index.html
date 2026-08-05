@@ -292,12 +292,12 @@
         <div><p class="label">PERMANENT DATA / LIVE ORDERS</p><h2 id="liveTransactionsHeading">My buy and sell transactions</h2></div>
         <span id="liveTransactionsStatus">Loading transactions…</span>
       </div>
-      <p class="data-note">Stored permanently in Data/live-trades.json. Sell P/L uses weighted-average recorded buy cost. Buy P/L compares its execution rate with the current CoinSpot wallet rate.</p>
+      <p class="data-note">Stored permanently in Data/live-trades.json. The estimated fee uses CoinSpot’s current 1% Instant Buy/Sell rate. Sell P/L uses weighted-average recorded buy cost; Buy P/L compares its execution rate with the current wallet rate. P/L uses returned transaction totals, so fees are not deducted twice.</p>
       <div id="liveTransactionSummaries" class="transaction-summaries"></div>
       <div class="transaction-table-wrap">
         <table class="transaction-table">
-          <thead><tr><th>Date / time</th><th>Coin</th><th>Side</th><th>Coin amount</th><th>AUD total</th><th>Execution rate</th><th>Profit / loss</th></tr></thead>
-          <tbody id="liveTransactionsBody"><tr><td colspan="7">No transactions recorded yet.</td></tr></tbody>
+          <thead><tr><th>Date / time</th><th>Coin</th><th>Side</th><th>Coin amount</th><th>AUD total</th><th>Execution rate</th><th>Estimated fee</th><th>Profit / loss</th></tr></thead>
+          <tbody id="liveTransactionsBody"><tr><td colspan="8">No transactions recorded yet.</td></tr></tbody>
         </table>
       </div>
     </article>

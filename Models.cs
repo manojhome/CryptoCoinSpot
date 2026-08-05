@@ -80,4 +80,5 @@ public sealed record LiveTradeTransaction(
     decimal CoinAmount,
     decimal TotalAud,
     decimal ExecutionRate,
-    decimal QuotedRate);
+    decimal QuotedRate,
+    decimal FeeAud = 0m);

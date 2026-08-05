@@ -24,7 +24,11 @@ public sealed class TradeTransactionStore
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            return await ReadUnsafeAsync(cancellationToken);
+            var transactions = await ReadUnsafeAsync(cancellationToken);
+            var normalized = NormalizeFees(transactions);
+            if (normalized.Updated)
+                await WriteUnsafeAsync(normalized.Transactions, cancellationToken);
+            return normalized.Transactions;
         }
         finally
         {
@@ -39,7 +43,8 @@ public sealed class TradeTransactionStore
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            var transactions = (await ReadUnsafeAsync(cancellationToken)).ToList();
+            var transactions = NormalizeFees(await ReadUnsafeAsync(cancellationToken))
+                .Transactions.ToList();
             transactions.Add(transaction);
             transactions.Sort((left, right) => left.ExecutedAt.CompareTo(right.ExecutedAt));
             await WriteUnsafeAsync(transactions, cancellationToken);
@@ -48,6 +53,19 @@ public sealed class TradeTransactionStore
         {
             _gate.Release();
         }
+    }
+
+    private static (IReadOnlyList<LiveTradeTransaction> Transactions, bool Updated) NormalizeFees(
+        IReadOnlyList<LiveTradeTransaction> transactions)
+    {
+        var updated = false;
+        var normalized = transactions.Select(transaction =>
+        {
+            if (transaction.FeeAud > 0 || transaction.TotalAud <= 0) return transaction;
+            updated = true;
+            return transaction with { FeeAud = Math.Round(transaction.TotalAud * 0.01m, 8) };
+        }).ToArray();
+        return (normalized, updated);
     }
 
     private async Task<IReadOnlyList<LiveTradeTransaction>> ReadUnsafeAsync(

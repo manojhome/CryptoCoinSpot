@@ -389,7 +389,8 @@ app.MapPost("/api/coinspot/trading/{side}/execute", async (
             coinAmount,
             totalAud,
             executionRate,
-            quote.Rate);
+            quote.Rate,
+            Math.Round(totalAud * 0.01m, 8));
         var transactionRecorded = true;
         string? persistenceWarning = null;
         try

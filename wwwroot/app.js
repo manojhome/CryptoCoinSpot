@@ -275,7 +275,7 @@ function drawLiveTransactions() {
   if (!liveTransactionsSnapshot.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 7;
+    cell.colSpan = 8;
     cell.textContent = "No live transactions recorded through this app yet.";
     row.appendChild(cell); body.appendChild(row);
     return;
@@ -289,9 +289,10 @@ function drawLiveTransactions() {
 
   chronological.forEach((transaction, index) => {
     const coin = transaction.coin;
-    const state = states.get(coin) || { quantity: 0, cost: 0, realized: 0, matchedSells: 0, unmatchedSells: 0 };
+    const state = states.get(coin) || { quantity: 0, cost: 0, realized: 0, fees: 0, matchedSells: 0, unmatchedSells: 0 };
     const coinAmount = Number(transaction.coinAmount);
     const totalAud = Number(transaction.totalAud);
+    state.fees += transactionFeeAud(transaction);
     if (transaction.side === "buy") {
       state.quantity += coinAmount;
       state.cost += totalAud;
@@ -330,7 +331,7 @@ function drawLiveTransactions() {
     const heading = document.createElement("strong");
     heading.textContent = `${coin} ${total == null ? "P/L unavailable" : formatPnl(total)}`;
     const detail = document.createElement("span");
-    detail.textContent = `Realized ${formatPnl(state.realized)} · Unrealized ${hasUnrealized ? formatPnl(unrealized) : "N/A"}` +
+    detail.textContent = `Realized ${formatPnl(state.realized)} · Unrealized ${hasUnrealized ? formatPnl(unrealized) : "N/A"} · Fees ${aud(state.fees, 2)}` +
       (state.unmatchedSells ? ` · ${state.unmatchedSells} sell(s) lack recorded buy cost` : "");
     card.append(heading, detail); summaries.appendChild(card);
   });
@@ -350,6 +351,7 @@ function drawLiveTransactions() {
       appendTransactionCell(row, number(transaction.coinAmount, 8));
       appendTransactionCell(row, aud(transaction.totalAud, 2));
       appendTransactionCell(row, aud(transaction.executionRate, Number(transaction.executionRate) < 1 ? 8 : 2));
+      appendTransactionCell(row, aud(transactionFeeAud(transaction), 2));
       const pnlCell = document.createElement("td");
       const pnl = pnlByTransaction.get(transaction);
       pnlCell.className = `transaction-pnl ${pnl == null ? "" : pnl.value >= 0 ? "profit" : "loss"}`;
@@ -367,6 +369,13 @@ function appendTransactionCell(row, value) {
 
 function formatPnl(value) {
   return `${value >= 0 ? "+" : "−"}${aud(Math.abs(value), 2)}`;
+}
+
+function transactionFeeAud(transaction) {
+  const storedFee = Number(transaction.feeAud);
+  return Number.isFinite(storedFee) && storedFee > 0
+    ? storedFee
+    : Number(transaction.totalAud) * .01;
 }
 $("priceChart").addEventListener("mousemove", event => {
   if (!snapshot?.hourly?.length) return;
