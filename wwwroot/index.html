@@ -21,6 +21,26 @@
       </div>
     </header>
 
+    <div class="bottom-charts top-charts">
+      <article class="gainers-card chart-card">
+        <div class="card-head">
+          <div><p class="label">COINSPOT-LISTED / 24 HOURS</p><h2>Top 50 gainers</h2></div>
+          <span id="gainersStatus">Loading ranking…</span>
+        </div>
+        <p class="data-note">CoinSpot supplies the listing universe. Percentage change and reference AUD price use matching KuCoin USDT markets because CoinSpot’s public latest-price API does not include 24-hour change.</p>
+        <div class="gainers-scroll"><canvas id="gainersChart" aria-label="Top 50 CoinSpot-listed gainers chart"></canvas></div>
+      </article>
+
+      <article class="wallet-card chart-card">
+        <div class="card-head">
+          <div><p class="label">COINSPOT / READ ONLY</p><h2>My CoinSpot wallet</h2></div>
+          <span id="walletStatus">Connecting…</span>
+        </div>
+        <p class="data-note">Current CoinSpot wallet balances and AUD values. Read-only API credentials are required; no trading action is available here.</p>
+        <div class="wallet-scroll"><canvas id="walletChart" aria-label="My CoinSpot wallet holdings chart"></canvas></div>
+      </article>
+    </div>
+
     <section class="control-panel" aria-label="Investment settings">
       <label>Coin ticker
         <input id="coin" value="TRX" maxlength="10" autocomplete="off" spellcheck="false">
@@ -35,26 +55,6 @@
     <div id="error" class="error" role="alert" hidden></div>
 
     <section id="dashboard" hidden>
-      <div class="bottom-charts">
-        <article class="gainers-card chart-card">
-          <div class="card-head">
-            <div><p class="label">COINSPOT-LISTED / 24 HOURS</p><h2>Top 50 gainers</h2></div>
-            <span id="gainersStatus">Loading ranking…</span>
-          </div>
-          <p class="data-note">CoinSpot supplies the listing universe. Percentage change and reference AUD price use matching KuCoin USDT markets because CoinSpot’s public latest-price API does not include 24-hour change.</p>
-          <div class="gainers-scroll"><canvas id="gainersChart" aria-label="Top 50 CoinSpot-listed gainers chart"></canvas></div>
-        </article>
-
-        <article class="wallet-card chart-card">
-          <div class="card-head">
-            <div><p class="label">COINSPOT / READ ONLY</p><h2>My CoinSpot wallet</h2></div>
-            <span id="walletStatus">Connecting…</span>
-          </div>
-          <p class="data-note">Current CoinSpot wallet balances and AUD values. Read-only API credentials are required; no trading action is available here.</p>
-          <div class="wallet-scroll"><canvas id="walletChart" aria-label="My CoinSpot wallet holdings chart"></canvas></div>
-        </article>
-      </div>
-
       <div class="signal-strip">
         <div>
           <p class="label">Strategy signal</p>
