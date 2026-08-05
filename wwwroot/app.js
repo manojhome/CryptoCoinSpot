@@ -176,6 +176,7 @@ function clearMarketSections() {
   $("dailyTrend").textContent = "—";
   $("dailyTrend").className = "trend-neutral";
   $("dailyTrendMeta").textContent = "Unavailable";
+  $("currentPriceRetrieved").textContent = "Price unavailable";
   $("dailyRows").innerHTML = "";
   $("pullbackChartRange").textContent = "Unavailable";
   for (const id of ["greenTripleRuns", "redTripleRuns", "greenDoubleRuns", "redDoubleRuns", "averageGreenRun", "averageRedRun"])
@@ -222,6 +223,15 @@ function render(data) {
   $("signal").className = `signal ${data.signal.action.startsWith("BUY") ? "buy" : ""}`;
   $("explanation").textContent = data.signal.explanation;
   $("currentPrice").textContent = aud(data.currentPrice, 6);
+  const priceRetrievedAt = new Date(data.refreshedAt).toLocaleString("en-AU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+  $("currentPriceRetrieved").textContent = `Retrieved ${priceRetrievedAt}`;
   $("units").textContent = number(units, 6);
   $("unitCoin").textContent = `${data.coin} at ${aud(entryPrice, 6)} entry`;
   $("currentValue").textContent = aud(currentValue, 2);

@@ -58,6 +58,7 @@ button span { margin-left: 18px; }
 .metrics strong.trend-down { color: var(--red); }
 .metrics strong.trend-neutral { color: var(--ink); }
 .metrics small { display: block; margin-top: 8px; color: var(--muted); }
+.metrics .price-retrieved { color: #8a9691; font-size: 10px; font-weight: 600; }
 .metrics .trend-percentage { color: var(--amber); font-weight: 800; }
 .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .chart-card { min-width: 0; padding: 20px; }
