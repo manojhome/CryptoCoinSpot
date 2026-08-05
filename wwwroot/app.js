@@ -721,6 +721,17 @@ function clearMarketSections() {
   $("currentPriceSource").textContent = "AUD market price";
   $("dailyRows").innerHTML = "";
   $("pullbackChartRange").textContent = "Unavailable";
+  $("sellTimingConfidence").textContent = "Hourly data unavailable";
+  $("bestSellTime").textContent = "—";
+  $("bestSellTimeMeta").textContent = "Waiting for data";
+  $("hourlySellStreak").textContent = "—";
+  $("hourlySellStreakMeta").textContent = "Waiting for data";
+  $("hourlyProfitTarget").textContent = "—";
+  $("hourlyProfitTargetMeta").textContent = "Waiting for data";
+  $("hourlyDefensivePrice").textContent = "—";
+  $("hourlyDefensivePriceMeta").textContent = "Waiting for data";
+  $("sellTimingSummary").textContent = "Hourly sell-timing analysis is unavailable.";
+  $("hourlyStreakCard").className = "sell-timing-card neutral";
   for (const id of ["greenTripleRuns", "redTripleRuns", "greenDoubleRuns", "redDoubleRuns", "averageGreenRun", "averageRedRun"])
     $(id).textContent = "—";
   $("strategySummary").className = "strategy-summary neutral";
@@ -862,8 +873,130 @@ function drawCharts(data) {
   const prices = data.hourly.map(x => Number(x.price));
   drawPriceCandles($("priceChart"), data.hourly, priceHover);
   $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
+  renderHourlySellTiming(data.hourly, Number(data.currentPrice));
   drawDailyPercentageAnalysis(data.daily);
   drawPullbackAnalysis(data.daily);
+}
+
+function renderHourlySellTiming(candles, currentPrice) {
+  if (!candles?.length || !Number.isFinite(currentPrice) || currentPrice <= 0) return;
+  const ordered = [...candles].sort((left, right) => new Date(left.time) - new Date(right.time));
+  const hourlyGroups = new Map();
+  const closeMoves = [];
+  const ranges = [];
+  const directions = [];
+
+  ordered.forEach((candle, index) => {
+    const open = Number(candle.open);
+    const high = Number(candle.high);
+    const low = Number(candle.low);
+    const close = Number(candle.close);
+    if (open > 0) {
+      const hour = new Date(candle.time).getHours();
+      const group = hourlyGroups.get(hour) || { hour, peakMoves: [], returns: [], green: 0, count: 0 };
+      group.peakMoves.push((high / open - 1) * 100);
+      group.returns.push((close / open - 1) * 100);
+      group.green += close >= open ? 1 : 0;
+      group.count += 1;
+      hourlyGroups.set(hour, group);
+      ranges.push((high - low) / open * 100);
+    }
+    if (index > 0) {
+      const previousClose = Number(ordered[index - 1].close);
+      const move = previousClose > 0 ? (close / previousClose - 1) * 100 : 0;
+      closeMoves.push(move);
+      directions.push(move > 0 ? "up" : move < 0 ? "down" : "flat");
+    }
+  });
+
+  const average = values => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  const groups = [...hourlyGroups.values()].map(group => ({
+    ...group,
+    averagePeak: average(group.peakMoves),
+    averageReturn: average(group.returns),
+    greenRate: group.count ? group.green / group.count * 100 : 0
+  }));
+  const best = groups.sort((left, right) =>
+    (right.averagePeak + Math.max(0, right.averageReturn) * .35) -
+    (left.averagePeak + Math.max(0, left.averageReturn) * .35))[0];
+  if (!best) return;
+
+  const runs = { up: [], down: [] };
+  let activeDirection = null;
+  let activeLength = 0;
+  for (const direction of directions) {
+    if (direction === "flat") {
+      if (activeDirection) runs[activeDirection].push(activeLength);
+      activeDirection = null;
+      activeLength = 0;
+    } else if (direction === activeDirection) {
+      activeLength += 1;
+    } else {
+      if (activeDirection) runs[activeDirection].push(activeLength);
+      activeDirection = direction;
+      activeLength = 1;
+    }
+  }
+  if (activeDirection) runs[activeDirection].push(activeLength);
+
+  const currentDirection = directions.at(-1) || "flat";
+  let currentStreak = 0;
+  for (let index = directions.length - 1; index >= 0 && directions[index] === currentDirection; index--) currentStreak += 1;
+  const averageUpRun = average(runs.up) || 1;
+  const averageDownRun = average(runs.down) || 1;
+  const expectedUpHours = Math.max(1, Math.min(3,
+    Math.round(averageUpRun - (currentDirection === "up" ? currentStreak - 1 : 0))));
+  const expectedDownHours = Math.max(1, Math.min(3,
+    Math.round(averageDownRun - (currentDirection === "down" ? currentStreak - 1 : 0))));
+  const positiveMoves = closeMoves.filter(move => move > 0);
+  const negativeMoves = closeMoves.filter(move => move < 0).map(Math.abs);
+  const averageRange = average(ranges);
+  const profitMovePercent = Math.max(
+    hourlyPercentile(positiveMoves, .65) * expectedUpHours,
+    averageRange * .5,
+    .05);
+  const defensiveMovePercent = Math.max(
+    hourlyPercentile(negativeMoves, .75) * expectedDownHours,
+    averageRange * .5,
+    .05);
+  const momentumTarget = currentPrice * (1 + profitMovePercent / 100);
+  const feeAdjustedEntry = Number(entryPrice) > 0 ? Number(entryPrice) / .99 : currentPrice;
+  const profitTarget = Math.max(momentumTarget, feeAdjustedEntry);
+  const defensivePrice = currentPrice * (1 - defensiveMovePercent / 100);
+  const priceDigits = currentPrice < 1 ? 8 : 2;
+
+  const start = new Date(2020, 0, 1, best.hour);
+  const end = new Date(2020, 0, 1, best.hour + 1);
+  const timeFormat = { hour: "numeric", minute: "2-digit" };
+  $("bestSellTime").textContent = `${start.toLocaleTimeString("en-AU", timeFormat)}–${end.toLocaleTimeString("en-AU", timeFormat)}`;
+  $("bestSellTimeMeta").textContent = `Avg intrahour peak +${best.averagePeak.toFixed(2)}% · ${best.greenRate.toFixed(0)}% green · local time`;
+  $("sellTimingConfidence").textContent = `${ordered.length} candles · ${best.count} observations in selected hour · limited sample`;
+
+  const streakLabel = currentDirection === "up" ? "GREEN" : currentDirection === "down" ? "RED" : "FLAT";
+  $("hourlySellStreak").textContent = currentDirection === "flat" ? streakLabel : `${currentStreak} × ${streakLabel}`;
+  $("hourlySellStreakMeta").textContent = `Average green ${averageUpRun.toFixed(1)}h · average red ${averageDownRun.toFixed(1)}h`;
+  $("hourlyStreakCard").className = `sell-timing-card ${currentDirection}`;
+
+  $("hourlyProfitTarget").textContent = aud(profitTarget, priceDigits);
+  $("hourlyProfitTargetMeta").textContent = `Momentum +${profitMovePercent.toFixed(2)}% · not below paper-entry break-even after est. 1% sell fee`;
+  $("hourlyDefensivePrice").textContent = aud(defensivePrice, priceDigits);
+  $("hourlyDefensivePriceMeta").textContent = `${defensiveMovePercent.toFixed(2)}% below current · 75th-percentile fall over ${expectedDownHours} expected hour(s)`;
+
+  $("sellTimingSummary").textContent = currentDirection === "down"
+    ? `Price has declined for ${currentStreak} consecutive hour(s). The defensive level is active as a modelled loss-control threshold; a break below it suggests the decline is larger than the recent 96-hour pattern.`
+    : currentDirection === "up"
+      ? `Price has risen for ${currentStreak} consecutive hour(s). The model favours watching the profit target near the observed sell window as the green run approaches its typical length.`
+      : "The latest hourly close is flat. Use the target and defensive level as a range until a new consecutive direction develops.";
+}
+
+function hourlyPercentile(values, percentile) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = (sorted.length - 1) * percentile;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
 }
 
 function drawDailyPercentageAnalysis(allCandles) {

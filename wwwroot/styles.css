@@ -131,6 +131,20 @@ button span { margin-left: 18px; }
 .pullback-controls select:disabled { opacity: .6; cursor: wait; }
 .pullback-controls span { grid-column: 1 / -1; color: var(--muted); font: 600 11px/1.2 ui-monospace, Consolas, monospace; }
 .pullback-period-row { display: flex; justify-content: flex-end; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.sell-timing-panel { margin-top: 16px; padding: 16px; border: 1px solid rgba(216,136,24,.45); border-radius: 12px; background: linear-gradient(135deg, rgba(216,136,24,.08), rgba(255,255,255,.85)); }
+.sell-timing-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.sell-timing-heading h3 { margin: 0; font-size: 18px; }
+.sell-timing-heading > span { color: var(--muted); font: 650 10px/1.35 ui-monospace, Consolas, monospace; text-align: right; }
+.sell-timing-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 9px; margin-top: 12px; }
+.sell-timing-card { padding: 12px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.sell-timing-card > span, .sell-timing-card > small { display: block; color: var(--muted); }
+.sell-timing-card > span { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.sell-timing-card > strong { display: block; margin: 5px 0; font: 850 20px/1.05 ui-monospace, Consolas, monospace; }
+.sell-timing-card > small { font-size: 9px; line-height: 1.4; }
+.sell-timing-card.profit > strong, .sell-timing-card.up > strong { color: var(--green-dark); }
+.sell-timing-card.loss > strong, .sell-timing-card.down > strong { color: var(--red); }
+.sell-timing-card.timing > strong { color: var(--amber); }
+.sell-timing-summary { margin: 10px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .streak-metrics { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 16px; }
 .streak-metrics > div { padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .streak-metrics span, .streak-metrics small { display: block; color: var(--muted); font-size: 11px; }
@@ -218,6 +232,7 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .live-trade-grid { grid-template-columns: 1fr; }
   .transaction-summaries { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .streak-metrics { grid-template-columns: repeat(3, 1fr); }
+  .sell-timing-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .strategy-summaries { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metrics { grid-template-columns: 1fr 1fr; }
   .charts, .lower-grid { grid-template-columns: 1fr; }
@@ -227,6 +242,9 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .control-panel, .metrics { grid-template-columns: 1fr; }
   .signal-strip { grid-template-columns: 1fr; }
   .streak-metrics { grid-template-columns: 1fr; }
+  .sell-timing-grid { grid-template-columns: 1fr; }
+  .sell-timing-heading { flex-direction: column; }
+  .sell-timing-heading > span { text-align: left; }
   .strategy-summaries { grid-template-columns: 1fr; }
   h1 { font-size: 45px; }
   .pullback-heading { align-items: flex-start; flex-direction: column; }

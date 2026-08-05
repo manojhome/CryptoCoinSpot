@@ -177,6 +177,19 @@
         <div class="card-head">
           <div><h2>TimelineData</h2></div>
         </div>
+        <section class="sell-timing-panel" aria-labelledby="sellTimingHeading">
+          <div class="sell-timing-heading">
+            <div><p class="label">96-HOUR HOURLY PATTERN</p><h3 id="sellTimingHeading">Sell timing analysis</h3></div>
+            <span id="sellTimingConfidence">Waiting for hourly candles</span>
+          </div>
+          <div class="sell-timing-grid">
+            <div class="sell-timing-card timing"><span>Observed sell window</span><strong id="bestSellTime">—</strong><small id="bestSellTimeMeta">Waiting for data</small></div>
+            <div id="hourlyStreakCard" class="sell-timing-card neutral"><span>Current hourly streak</span><strong id="hourlySellStreak">—</strong><small id="hourlySellStreakMeta">Waiting for data</small></div>
+            <div class="sell-timing-card profit"><span>Modelled profit target</span><strong id="hourlyProfitTarget">—</strong><small id="hourlyProfitTargetMeta">Waiting for data</small></div>
+            <div class="sell-timing-card loss"><span>Defensive sell price</span><strong id="hourlyDefensivePrice">—</strong><small id="hourlyDefensivePriceMeta">Waiting for data</small></div>
+          </div>
+          <p id="sellTimingSummary" class="sell-timing-summary">Analysing hourly rises, falls and time-of-day patterns…</p>
+        </section>
         <div class="streak-metrics" aria-label="Consecutive daily candle statistics">
           <div class="streak-green"><span>3+ green streaks</span><strong id="greenTripleRuns">—</strong><small>distinct runs</small></div>
           <div class="streak-red"><span>3+ red streaks</span><strong id="redTripleRuns">—</strong><small>distinct runs</small></div>

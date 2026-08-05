@@ -104,6 +104,15 @@ descriptive screen, not a prediction or trading instruction. Stablecoins are
 included as requested, but their trend mostly reflects small deviations from
 their peg and AUD/USD movement.
 
+TimelineData includes a 96-hour sell-timing panel. It groups hourly candles by
+the browser's local hour to identify the window with the strongest average
+intrahour peak, measures consecutive close-to-close green and red runs, and
+calculates two descriptive thresholds. The profit target combines recent
+positive momentum with the paper-entry break-even price after an estimated 1%
+sell fee. The defensive level uses the 75th-percentile hourly decline and the
+typical remaining red-streak length. With roughly four observations per hour of
+day, this is a limited in-sample pattern, not a profit guarantee or forecast.
+
 Public data providers can rate-limit or change their APIs. Do not automate live
 orders without persistence, idempotency, reconciliation against CoinSpot order
 history, maximum position limits, and alerting.
