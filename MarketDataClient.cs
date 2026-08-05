@@ -60,6 +60,11 @@ public sealed class MarketDataClient(HttpClient http)
             symbol, "1hour", DateTimeOffset.UtcNow.AddDays(-days), currency, cancellationToken);
     }
 
+    public Task<decimal> GetCoinSpotCurrentPriceAsync(
+        string coin,
+        CancellationToken cancellationToken) =>
+        GetCoinSpotPriceAsync(CoinSpotClient.NormalizeCoin(coin), cancellationToken);
+
     public async Task<IReadOnlyList<Candle>> GetRecentDailyAsync(
         string coin, int days, string currency, CancellationToken cancellationToken)
     {

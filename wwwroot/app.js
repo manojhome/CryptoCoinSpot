@@ -223,7 +223,7 @@ function render(data) {
   $("signal").className = `signal ${data.signal.action.startsWith("BUY") ? "buy" : ""}`;
   $("explanation").textContent = data.signal.explanation;
   $("currentPrice").textContent = aud(data.currentPrice, 6);
-  const priceRetrievedAt = new Date(data.refreshedAt).toLocaleString("en-AU", {
+  const priceRetrievedAt = new Date(data.currentPriceRetrievedAt || data.refreshedAt).toLocaleString("en-AU", {
     day: "2-digit",
     month: "short",
     year: "numeric",

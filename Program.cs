@@ -35,6 +35,8 @@ app.MapGet("/api/dashboard", async (
             return Results.BadRequest(new { error = "Investment amount must be between $0.01 and $100,000,000." });
 
         var hourly = await market.GetHourlyAsync(coin, 4, "aud", cancellationToken);
+        var current = await market.GetCoinSpotCurrentPriceAsync(coin, cancellationToken);
+        var currentPriceRetrievedAt = DateTimeOffset.UtcNow;
         IReadOnlyList<Candle> storedDaily;
         var dailySource = "permanent local file";
         try
@@ -59,7 +61,6 @@ app.MapGet("/api/dashboard", async (
         var daily = storedDaily.TakeLast(365).ToArray();
         var signal = TrxStrategy.Evaluate(coin, daily);
         var trend = Analysis.CalculateTrend(coin, hourly);
-        var current = hourly[^1].Close;
         var units = amount / current;
         var stop = signal.Support > 0 ? Math.Max(current * 0.96m, signal.Support) : current * 0.96m;
 
@@ -68,6 +69,8 @@ app.MapGet("/api/dashboard", async (
             coin,
             amount,
             currentPrice = current,
+            currentPriceSource = "CoinSpot public AUD last price",
+            currentPriceRetrievedAt,
             units,
             currentValue = amount,
             signal,
