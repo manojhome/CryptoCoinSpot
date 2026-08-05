@@ -275,7 +275,7 @@ function drawLiveTransactions() {
   if (!liveTransactionsSnapshot.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 8;
+    cell.colSpan = 9;
     cell.textContent = "No live transactions recorded through this app yet.";
     row.appendChild(cell); body.appendChild(row);
     return;
@@ -284,6 +284,7 @@ function drawLiveTransactions() {
   const currentRates = new Map((walletSnapshot || []).map(item => [item.coin, Number(item.rateAud)]));
   const states = new Map();
   const rowPnl = new Map();
+  const buyLots = new Map();
   const chronological = [...liveTransactionsSnapshot].sort(
     (left, right) => new Date(left.executedAt) - new Date(right.executedAt));
 
@@ -296,11 +297,21 @@ function drawLiveTransactions() {
     if (transaction.side === "buy") {
       state.quantity += coinAmount;
       state.cost += totalAud;
+      const lots = buyLots.get(coin) || [];
+      lots.push({ transaction, original: coinAmount, remaining: coinAmount, totalAud });
+      buyLots.set(coin, lots);
       const currentRate = currentRates.get(coin);
       rowPnl.set(index, Number.isFinite(currentRate)
         ? { value: (currentRate - Number(transaction.executionRate)) * coinAmount, label: "vs current rate" }
         : null);
     } else {
+      let sellRemaining = coinAmount;
+      for (const lot of buyLots.get(coin) || []) {
+        if (sellRemaining <= 0) break;
+        const consumed = Math.min(lot.remaining, sellRemaining);
+        lot.remaining -= consumed;
+        sellRemaining -= consumed;
+      }
       const matched = Math.min(Math.max(state.quantity, 0), coinAmount);
       if (matched > 0 && state.quantity > 0) {
         const averageCost = state.cost / state.quantity;
@@ -338,6 +349,25 @@ function drawLiveTransactions() {
 
   const pnlByTransaction = new Map();
   chronological.forEach((transaction, index) => pnlByTransaction.set(transaction, rowPnl.get(index)));
+  const saleNowByTransaction = new Map();
+  for (const [coin, lots] of buyLots) {
+    const currentRate = currentRates.get(coin);
+    for (const lot of lots) {
+      const soldAmount = lot.original - lot.remaining;
+      if (soldAmount <= 0.000000000001) {
+        saleNowByTransaction.set(lot.transaction, Number.isFinite(currentRate)
+          ? {
+              value: lot.original * currentRate * .99 - lot.totalAud,
+              label: `at ${aud(currentRate, currentRate < 1 ? 8 : 2)} after est. 1% sell fee`
+            }
+          : { status: "Current rate unavailable" });
+      } else {
+        saleNowByTransaction.set(lot.transaction, {
+          status: lot.remaining > 0.000000000001 ? "Partially sold" : "Sold"
+        });
+      }
+    }
+  }
   [...liveTransactionsSnapshot].sort(
     (left, right) => new Date(right.executedAt) - new Date(left.executedAt)).forEach(transaction => {
       const row = document.createElement("tr");
@@ -359,7 +389,17 @@ function drawLiveTransactions() {
       if (pnl) {
         const note = document.createElement("small"); note.textContent = pnl.label; pnlCell.appendChild(note);
       }
-      row.appendChild(pnlCell); body.appendChild(row);
+      row.appendChild(pnlCell);
+      const saleNowCell = document.createElement("td");
+      const saleNow = transaction.side === "buy" ? saleNowByTransaction.get(transaction) : null;
+      if (saleNow?.value != null) {
+        saleNowCell.className = `transaction-pnl ${saleNow.value >= 0 ? "profit" : "loss"}`;
+        saleNowCell.textContent = formatPnl(saleNow.value);
+        const note = document.createElement("small"); note.textContent = saleNow.label; saleNowCell.appendChild(note);
+      } else {
+        saleNowCell.textContent = transaction.side === "buy" ? saleNow?.status || "N/A" : "—";
+      }
+      row.appendChild(saleNowCell); body.appendChild(row);
     });
 }
 

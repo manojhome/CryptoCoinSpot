@@ -88,7 +88,7 @@ button span { margin-left: 18px; }
 .transaction-summary.profit > strong { color: var(--green-dark); }
 .transaction-summary.loss > strong { color: var(--red); }
 .transaction-table-wrap { max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
-.transaction-table { min-width: 820px; margin-top: 0; }
+.transaction-table { min-width: 1020px; margin-top: 0; }
 .transaction-side { display: inline-block; min-width: 42px; padding: 4px 6px; border-radius: 999px; color: white; text-align: center; font-size: 9px; font-weight: 850; }
 .transaction-side.buy { background: var(--green); }
 .transaction-side.sell { background: var(--red); }
