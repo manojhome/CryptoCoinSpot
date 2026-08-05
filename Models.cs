@@ -47,7 +47,8 @@ public sealed record MarketGainer(
     string Coin,
     string Name,
     decimal PriceAud,
-    decimal Change24HoursPercent);
+    decimal Change24HoursPercent,
+    decimal? Change1HourPercent);
 
 public sealed record WalletHolding(
     string Coin,

@@ -182,7 +182,7 @@ app.MapGet("/api/gainers", async (
         return Results.Ok(new
         {
             period = "24h",
-            source = "CoinSpot website coin selection; direct CoinSpot AUD prices where published; 24-hour change from matching KuCoin USDT markets",
+            source = "CoinSpot website coin selection and 5-minute chart history for 1-hour change; direct CoinSpot AUD prices where published; 24-hour change from matching KuCoin USDT markets",
             items = gainers ?? []
         });
     }

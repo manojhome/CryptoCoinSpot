@@ -173,13 +173,85 @@ public sealed class MarketDataClient(HttpClient http)
             candidates.Add((symbol, symbol, price, change));
         }
 
-        return candidates
+        var topGainers = candidates
             .GroupBy(x => x.Coin, StringComparer.OrdinalIgnoreCase)
             .Select(x => x.First())
             .OrderByDescending(x => x.Change)
             .Take(limit)
-            .Select((x, index) => new MarketGainer(index + 1, x.Coin, x.Name, x.Price, x.Change))
             .ToArray();
+
+        var oneHourChanges = await Task.WhenAll(topGainers.Select(async candidate =>
+        {
+            var change = await GetCoinSpotOneHourChangeAsync(candidate.Coin, cancellationToken);
+            return (candidate.Coin, Change: change);
+        }));
+        var oneHourByCoin = oneHourChanges.ToDictionary(
+            x => x.Coin, x => x.Change, StringComparer.OrdinalIgnoreCase);
+
+        return topGainers
+            .Select((x, index) => new MarketGainer(
+                index + 1, x.Coin, x.Name, x.Price, x.Change, oneHourByCoin[x.Coin]))
+            .ToArray();
+    }
+
+    private async Task<decimal?> GetCoinSpotOneHourChangeAsync(
+        string coin, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var from = now.AddHours(-2).ToUnixTimeSeconds();
+            var to = now.ToUnixTimeSeconds();
+            using var response = await GetWithRateLimitRetryAsync(
+                $"https://www.coinspot.com.au/charts/history?symbol={Uri.EscapeDataString(coin)}" +
+                $"&resolution=5&from={from}&to={to}",
+                cancellationToken);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var text = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var json = JsonDocument.Parse(text);
+            if (!json.RootElement.TryGetProperty("s", out var status) ||
+                !string.Equals(status.GetString(), "ok", StringComparison.OrdinalIgnoreCase) ||
+                !json.RootElement.TryGetProperty("t", out var timesElement) ||
+                !json.RootElement.TryGetProperty("c", out var closesElement) ||
+                timesElement.ValueKind != JsonValueKind.Array ||
+                closesElement.ValueKind != JsonValueKind.Array)
+                return null;
+
+            var times = timesElement.EnumerateArray().Select(x => x.GetInt64()).ToArray();
+            var closes = closesElement.EnumerateArray().Select(ReadDecimal).ToArray();
+            if (times.Length == 0 || times.Length != closes.Length) return null;
+
+            var points = times.Zip(closes, (time, close) => new { Time = time, Close = close })
+                .Where(x => x.Close > 0)
+                .OrderBy(x => x.Time)
+                .ToArray();
+            if (points.Length < 2) return null;
+
+            var target = now.AddHours(-1).ToUnixTimeSeconds();
+            var baseline = points
+                .Where(x => x.Time <= target)
+                .OrderByDescending(x => x.Time)
+                .Select(x => x.Close)
+                .FirstOrDefault();
+            var currentPrice = points[^1].Close;
+
+            return baseline > 0
+                ? (currentPrice - baseline) / baseline * 100m
+                : null;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private async Task<HttpResponseMessage> GetWithRateLimitRetryAsync(
