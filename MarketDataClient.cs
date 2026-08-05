@@ -133,7 +133,22 @@ public sealed class MarketDataClient(HttpClient http)
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
             .Select(x => Uri.UnescapeDataString(x.Groups[1].Value).ToUpperInvariant())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var audPerUsdt = await GetCoinSpotPriceAsync("USDT", cancellationToken);
+
+        using var coinSpotResponse = await http.GetAsync(
+            "https://www.coinspot.com.au/pubapi/v2/latest", cancellationToken);
+        var coinSpotText = await coinSpotResponse.Content.ReadAsStringAsync(cancellationToken);
+        if (!coinSpotResponse.IsSuccessStatusCode)
+            throw new HttpRequestException($"CoinSpot latest prices returned {(int)coinSpotResponse.StatusCode}.");
+        using var coinSpotJson = JsonDocument.Parse(coinSpotText);
+        var coinSpotPrices = coinSpotJson.RootElement.GetProperty("prices")
+            .EnumerateObject()
+            .Where(x => !x.Name.Contains('_') && x.Value.TryGetProperty("last", out _))
+            .Select(x => (Coin: x.Name.ToUpperInvariant(), Price: ReadDecimal(x.Value.GetProperty("last"))))
+            .Where(x => x.Price > 0)
+            .ToDictionary(x => x.Coin, x => x.Price, StringComparer.OrdinalIgnoreCase);
+        var audPerUsdt = coinSpotPrices.TryGetValue("USDT", out var usdtPrice)
+            ? usdtPrice
+            : await GetCoinSpotPriceAsync("USDT", cancellationToken);
 
         using var response = await GetWithRateLimitRetryAsync(
             $"{KuCoinRoot}/market/allTickers", cancellationToken);
@@ -152,7 +167,9 @@ public sealed class MarketDataClient(HttpClient http)
                 !item.TryGetProperty("changeRate", out var changeElement) ||
                 !item.TryGetProperty("last", out var lastElement)) continue;
             var change = ReadDecimal(changeElement) * 100m;
-            var price = ReadDecimal(lastElement) * audPerUsdt;
+            var price = coinSpotPrices.TryGetValue(symbol, out var coinSpotPrice)
+                ? coinSpotPrice
+                : ReadDecimal(lastElement) * audPerUsdt;
             candidates.Add((symbol, symbol, price, change));
         }
 

@@ -27,7 +27,7 @@
           <div><p class="label">COINSPOT-LISTED / 24 HOURS</p><h2>Top 50 gainers</h2></div>
           <span id="gainersStatus">Loading ranking…</span>
         </div>
-        <p class="data-note">Click a coin row to analyse it. CoinSpot supplies the listing universe. Percentage change and reference AUD price use matching KuCoin USDT markets because CoinSpot’s public latest-price API does not include 24-hour change.</p>
+        <p class="data-note">Click a coin row to analyse it. Coin selection comes from CoinSpot’s website. Direct CoinSpot AUD prices are used where its public API publishes them; matching KuCoin markets provide the missing reference prices and 24-hour change.</p>
         <div class="gainers-scroll"><canvas id="gainersChart" aria-label="Top 50 CoinSpot-listed gainers chart"></canvas></div>
       </article>
 
@@ -64,7 +64,7 @@
       </div>
 
       <div class="metrics">
-        <article><p>Current price</p><strong id="currentPrice">—</strong><small>CoinSpot AUD last price</small><small id="currentPriceRetrieved" class="price-retrieved">Waiting for price</small></article>
+        <article><p>Current price</p><strong id="currentPrice">—</strong><small id="currentPriceSource">AUD market price</small><small id="currentPriceRetrieved" class="price-retrieved">Waiting for price</small></article>
         <article><p>Paper units</p><strong id="units">—</strong><small id="unitCoin">coins</small></article>
         <article><p>Current value</p><strong id="currentValue">—</strong><small id="valueChange">entry snapshot</small></article>
         <article><p>Hourly trend</p><strong id="trend">—</strong><small id="trendMeta">—</small></article>

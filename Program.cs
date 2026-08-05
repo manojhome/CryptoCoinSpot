@@ -35,7 +35,18 @@ app.MapGet("/api/dashboard", async (
             return Results.BadRequest(new { error = "Investment amount must be between $0.01 and $100,000,000." });
 
         var hourly = await market.GetHourlyAsync(coin, 4, "aud", cancellationToken);
-        var current = await market.GetCoinSpotCurrentPriceAsync(coin, cancellationToken);
+        decimal current;
+        string currentPriceSource;
+        try
+        {
+            current = await market.GetCoinSpotCurrentPriceAsync(coin, cancellationToken);
+            currentPriceSource = "CoinSpot public AUD last price";
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            current = hourly[^1].Close;
+            currentPriceSource = "CoinSpot-listed KuCoin market converted to AUD";
+        }
         var currentPriceRetrievedAt = DateTimeOffset.UtcNow;
         IReadOnlyList<Candle> storedDaily;
         var dailySource = "permanent local file";
@@ -69,7 +80,7 @@ app.MapGet("/api/dashboard", async (
             coin,
             amount,
             currentPrice = current,
-            currentPriceSource = "CoinSpot public AUD last price",
+            currentPriceSource,
             currentPriceRetrievedAt,
             units,
             currentValue = amount,
@@ -171,7 +182,7 @@ app.MapGet("/api/gainers", async (
         return Results.Ok(new
         {
             period = "24h",
-            source = "CoinSpot-listed assets; price and 24-hour change from KuCoin USDT markets",
+            source = "CoinSpot website coin selection; direct CoinSpot AUD prices where published; 24-hour change from matching KuCoin USDT markets",
             items = gainers ?? []
         });
     }

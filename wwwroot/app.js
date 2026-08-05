@@ -177,6 +177,7 @@ function clearMarketSections() {
   $("dailyTrend").className = "trend-neutral";
   $("dailyTrendMeta").textContent = "Unavailable";
   $("currentPriceRetrieved").textContent = "Price unavailable";
+  $("currentPriceSource").textContent = "AUD market price";
   $("dailyRows").innerHTML = "";
   $("pullbackChartRange").textContent = "Unavailable";
   for (const id of ["greenTripleRuns", "redTripleRuns", "greenDoubleRuns", "redDoubleRuns", "averageGreenRun", "averageRedRun"])
@@ -223,6 +224,7 @@ function render(data) {
   $("signal").className = `signal ${data.signal.action.startsWith("BUY") ? "buy" : ""}`;
   $("explanation").textContent = data.signal.explanation;
   $("currentPrice").textContent = aud(data.currentPrice, 6);
+  $("currentPriceSource").textContent = data.currentPriceSource;
   const priceRetrievedAt = new Date(data.currentPriceRetrievedAt || data.refreshedAt).toLocaleString("en-AU", {
     day: "2-digit",
     month: "short",
