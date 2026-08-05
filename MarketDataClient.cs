@@ -181,27 +181,74 @@ public sealed class MarketDataClient(HttpClient http)
             .ToArray();
 
         using var hourlyConcurrency = new SemaphoreSlim(8);
-        var oneHourChanges = await Task.WhenAll(topGainers.Select(async candidate =>
+        var recentChanges = await Task.WhenAll(topGainers.Select(async candidate =>
         {
             await hourlyConcurrency.WaitAsync(cancellationToken);
             try
             {
-                var change = await GetCoinSpotOneHourChangeAsync(candidate.Coin, cancellationToken)
+                var oneHour = await GetCoinSpotOneHourChangeAsync(candidate.Coin, cancellationToken)
                     ?? await GetKuCoinOneHourChangeAsync(candidate.Coin, cancellationToken);
-                return (candidate.Coin, Change: change);
+                var daily = await GetKuCoinCompletedDailyChangesAsync(candidate.Coin, cancellationToken);
+                return (candidate.Coin, OneHour: oneHour, daily.PreviousDay, daily.DayBefore);
             }
             finally
             {
                 hourlyConcurrency.Release();
             }
         }));
-        var oneHourByCoin = oneHourChanges.ToDictionary(
-            x => x.Coin, x => x.Change, StringComparer.OrdinalIgnoreCase);
+        var changesByCoin = recentChanges.ToDictionary(
+            x => x.Coin, x => x, StringComparer.OrdinalIgnoreCase);
 
         return topGainers
             .Select((x, index) => new MarketGainer(
-                index + 1, x.Coin, x.Name, x.Price, x.Change, oneHourByCoin[x.Coin]))
+                index + 1, x.Coin, x.Name, x.Price,
+                changesByCoin[x.Coin].PreviousDay,
+                changesByCoin[x.Coin].DayBefore,
+                x.Change,
+                changesByCoin[x.Coin].OneHour))
             .ToArray();
+    }
+
+    private async Task<(decimal? PreviousDay, decimal? DayBefore)> GetKuCoinCompletedDailyChangesAsync(
+        string coin, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var todayUtc = DateTimeOffset.UtcNow.Date;
+            var candles = await GetKuCoinCandlesAsync(
+                coin, "1day", DateTimeOffset.UtcNow.AddDays(-7), "USDT", cancellationToken);
+            var completed = candles
+                .Where(x => x.Time.UtcDateTime.Date < todayUtc && x.Close > 0)
+                .OrderBy(x => x.Time)
+                .TakeLast(3)
+                .ToArray();
+            if (completed.Length < 3) return (null, null);
+
+            static decimal Change(Candle current, Candle previous) =>
+                previous.Close > 0
+                    ? (current.Close - previous.Close) / previous.Close * 100m
+                    : 0m;
+
+            return (
+                Change(completed[2], completed[1]),
+                Change(completed[1], completed[0]));
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return (null, null);
+        }
+        catch (HttpRequestException)
+        {
+            return (null, null);
+        }
+        catch (InvalidOperationException)
+        {
+            return (null, null);
+        }
+        catch (JsonException)
+        {
+            return (null, null);
+        }
     }
 
     private async Task<decimal?> GetCoinSpotOneHourChangeAsync(

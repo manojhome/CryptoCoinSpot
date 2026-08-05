@@ -87,6 +87,12 @@ available balance decreased during the quote window.
 
 ## Data and analysis
 
+Top 50 gainers are selected from CoinSpot-listed coins. The **Prev day** and
+**Day before** columns use the latest three completed KuCoin UTC daily candles
+to calculate two close-to-close percentage changes. These values are independent
+of the rolling 24H and 1H columns; a missing daily market is displayed as `N/A`
+without removing the coin from the ranking.
+
 CoinSpot's public API exposes current prices and only recent completed orders,
 not five years of OHLC candles. Five-year daily candles therefore come from the
 public Coinbase Exchange API in USD; dashboard hourly and daily candles come from

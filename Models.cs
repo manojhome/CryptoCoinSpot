@@ -47,6 +47,8 @@ public sealed record MarketGainer(
     string Coin,
     string Name,
     decimal PriceAud,
+    decimal? PreviousDayChangePercent,
+    decimal? DayBeforeChangePercent,
     decimal Change24HoursPercent,
     decimal? Change1HourPercent);
 
