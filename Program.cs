@@ -602,6 +602,9 @@ app.MapGet("/api/coinspot/trading/transactions", async (
     }
 });
 
+// Data files are server-side storage only. They must never be served directly,
+// even to an authenticated browser; callers use the protected API routes.
+app.Map("/Data/{**path}", () => Results.NotFound());
 app.Map("/api/{**path}", () => Results.NotFound(new
 {
     error = "The requested API endpoint is unavailable. Restart the app after updating it and try again."
