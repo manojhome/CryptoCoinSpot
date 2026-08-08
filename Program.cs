@@ -1,5 +1,7 @@
 using CryptoTrader;
 using Microsoft.Extensions.Caching.Memory;
+using System.Security.Cryptography;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddUserSecrets<Program>(optional: true);
@@ -20,8 +22,69 @@ builder.Services.AddHttpClient(nameof(CoinSpotClient), client =>
 });
 
 var app = builder.Build();
+const string sitePassword = "TEST1234789!";
+const string accessCookieName = "CryptoCoinSpotAccess";
+var accessSessionToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/access"))
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        await next();
+        return;
+    }
+
+    var granted = context.Request.Cookies.TryGetValue(accessCookieName, out var suppliedToken) &&
+                  string.Equals(suppliedToken, accessSessionToken, StringComparison.Ordinal);
+    if (granted)
+    {
+        await next();
+        return;
+    }
+
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        await context.Response.WriteAsJsonAsync(new { error = "Access Denied" });
+        return;
+    }
+
+    context.Response.Redirect("/access/login");
+});
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+app.MapGet("/access/login", (HttpContext context) =>
+{
+    var alreadyGranted = context.Request.Cookies.TryGetValue(accessCookieName, out var suppliedToken) &&
+                         string.Equals(suppliedToken, accessSessionToken, StringComparison.Ordinal);
+    return alreadyGranted
+        ? Results.Redirect("/")
+        : Results.Content(AccessPage(false), "text/html; charset=utf-8", Encoding.UTF8);
+});
+
+app.MapPost("/access/login", async (HttpContext context) =>
+{
+    var form = await context.Request.ReadFormAsync(context.RequestAborted);
+    if (!string.Equals(form["password"], sitePassword, StringComparison.Ordinal))
+        return Results.Content(
+            AccessPage(true),
+            "text/html; charset=utf-8",
+            Encoding.UTF8,
+            StatusCodes.Status401Unauthorized);
+
+    context.Response.Cookies.Append(accessCookieName, accessSessionToken, new CookieOptions
+    {
+        HttpOnly = true,
+        IsEssential = true,
+        SameSite = SameSiteMode.Strict,
+        Secure = context.Request.IsHttps,
+        Path = "/"
+    });
+    return Results.Redirect("/");
+});
 
 app.MapGet("/api/dashboard", async (
     string coin,
@@ -496,6 +559,45 @@ app.Map("/api/{**path}", () => Results.NotFound(new
 }));
 app.MapFallbackToFile("index.html");
 app.Run();
+
+static string AccessPage(bool denied) => $$"""
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CryptoCoinSpot access</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; color: #10201b; background: radial-gradient(circle at 75% 10%, rgba(200,240,108,.34), transparent 24rem), #f4f5ef; }
+    main { width: min(430px, calc(100% - 32px)); padding: 34px; background: white; border: 1px solid #dce2da; border-radius: 18px; box-shadow: 0 18px 45px rgba(16,32,27,.14); }
+    p { margin: 0 0 10px; color: #08734a; font: 800 11px/1.2 ui-monospace, Consolas, monospace; letter-spacing: .14em; }
+    h1 { margin: 0 0 10px; font-size: 32px; letter-spacing: -.04em; }
+    .hint { margin: 0 0 22px; color: #64736e; font: 400 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
+    label { display: grid; gap: 8px; color: #64736e; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    input { width: 100%; height: 50px; padding: 0 14px; color: #10201b; background: #f4f5ef; border: 1px solid #bfc9c2; border-radius: 10px; outline: 0; font: 700 18px/1 ui-monospace, Consolas, monospace; }
+    input:focus { border-color: #12a66a; box-shadow: 0 0 0 3px rgba(18,166,106,.14); }
+    button { width: 100%; height: 50px; margin-top: 14px; border: 0; border-radius: 10px; color: #10201b; background: #c8f06c; font-size: 15px; font-weight: 850; cursor: pointer; }
+    .denied { margin: 0 0 16px; padding: 12px 14px; color: #8f2020; background: #ffeded; border: 1px solid #f3c3c3; border-radius: 9px; font: 800 14px/1.2 Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <p>CRYPTOCOINSPOT / PRIVATE ACCESS</p>
+    <h1>Enter password</h1>
+    <div class="hint">Authentication is required before the dashboard or its APIs can be accessed.</div>
+    {{(denied ? "<div class=\"denied\" role=\"alert\">Access Denied</div>" : "")}}
+    <form method="post" action="/access/login">
+      <label>Password
+        <input name="password" type="password" autocomplete="current-password" autofocus required>
+      </label>
+      <button type="submit">Access site</button>
+    </form>
+  </main>
+</body>
+</html>
+""";
 
 static (string? ApiKey, string? ApiSecret) GetTradingCredentials(IConfiguration configuration) =>
     (Environment.GetEnvironmentVariable("COINSPOT_API_KEY") ?? configuration["CoinSpot:ApiKey"],

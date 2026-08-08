@@ -3,6 +3,13 @@
 A .NET 8 ASP.NET Core dashboard for paper-investment tracking, CoinSpot market
 data, historical statistics, and hourly trend screening.
 
+## Site access
+
+The dashboard and all API routes are protected by a server-side password gate.
+The hardcoded password is `TEST1234789!`. A successful login creates an
+HttpOnly, SameSite=Strict session cookie; restarting the app invalidates existing
+sessions. An incorrect password returns an **Access Denied** page.
+
 ## Security first
 
 The API key posted in chat should be considered exposed. Revoke it, create a new
