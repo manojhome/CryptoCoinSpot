@@ -1589,8 +1589,9 @@ function drawGainers(items) {
   ctx.scale(ratio, ratio);
   ctx.font = "11px ui-monospace, Consolas, monospace";
   ctx.textBaseline = "middle";
-  const labelWidth = 88;
-  const valueWidth = 425;
+  const compact = width < 620;
+  const labelWidth = compact ? 78 : 88;
+  const valueWidth = compact ? 210 : 425;
   const barWidth = Math.max(80, width - labelWidth - valueWidth - 18);
   const maxMagnitude = Math.max(1, ...items.map(x => Math.abs(Number(x.change24HoursPercent))));
 
@@ -1599,11 +1600,17 @@ function drawGainers(items) {
   ctx.textAlign = "left";
   ctx.fillText("COIN", 36, 12);
   ctx.textAlign = "right";
-  ctx.fillText("PREV DAY", width - 342, 12);
-  ctx.fillText("DAY BEFORE", width - 252, 12);
-  ctx.fillText("24H", width - 164, 12);
-  ctx.fillText("1H", width - 83, 12);
-  ctx.fillText("PRICE", width - 4, 12);
+  if (compact) {
+    ctx.fillText("3D AVG", width - 125, 12);
+    ctx.fillText("24H", width - 65, 12);
+    ctx.fillText("PRICE", width - 4, 12);
+  } else {
+    ctx.fillText("PREV DAY", width - 342, 12);
+    ctx.fillText("DAY BEFORE", width - 252, 12);
+    ctx.fillText("24H", width - 164, 12);
+    ctx.fillText("1H", width - 83, 12);
+    ctx.fillText("PRICE", width - 4, 12);
+  }
   ctx.strokeStyle = "rgba(100,115,110,.2)";
   ctx.beginPath(); ctx.moveTo(0, headerHeight - 1); ctx.lineTo(width, headerHeight - 1); ctx.stroke();
 
@@ -1612,6 +1619,9 @@ function drawGainers(items) {
     const change = Number(item.change24HoursPercent);
     const previousDay = item.previousDayChangePercent == null ? null : Number(item.previousDayChangePercent);
     const dayBefore = item.dayBeforeChangePercent == null ? null : Number(item.dayBeforeChangePercent);
+    const threeDayAverage = previousDay == null || dayBefore == null
+      ? null
+      : (change + previousDay + dayBefore) / 3;
     const hourly = item.change1HourPercent == null ? null : Number(item.change1HourPercent);
     const colour = change >= 0 ? "#12a66a" : "#d84d4d";
     if (item.coin === selectedGainerCoin) {
@@ -1628,16 +1638,24 @@ function drawGainers(items) {
     ctx.font = "11px ui-monospace, Consolas, monospace";
     ctx.fillStyle = colour;
     ctx.fillRect(labelWidth, y - 7, Math.max(2, Math.abs(change) / maxMagnitude * barWidth), 14);
-    ctx.textAlign = "right"; ctx.font = "700 11px ui-monospace, Consolas, monospace";
-    ctx.fillStyle = previousDay == null ? "#89938f" : (previousDay >= 0 ? "#12a66a" : "#d84d4d");
-    ctx.fillText(previousDay == null ? "N/A" : `${previousDay >= 0 ? "+" : ""}${previousDay.toFixed(2)}%`, width - 342, y);
-    ctx.fillStyle = dayBefore == null ? "#89938f" : (dayBefore >= 0 ? "#12a66a" : "#d84d4d");
-    ctx.fillText(dayBefore == null ? "N/A" : `${dayBefore >= 0 ? "+" : ""}${dayBefore.toFixed(2)}%`, width - 252, y);
-    ctx.fillStyle = colour;
-    ctx.fillText(`${change >= 0 ? "+" : ""}${change.toFixed(2)}%`, width - 164, y);
-    ctx.fillStyle = hourly == null ? "#89938f" : (hourly >= 0 ? "#12a66a" : "#d84d4d");
-    ctx.fillText(hourly == null ? "N/A" : `${hourly >= 0 ? "+" : ""}${hourly.toFixed(2)}%`, width - 83, y);
-    ctx.fillStyle = "#64736e"; ctx.font = "10px ui-monospace, Consolas, monospace";
+    ctx.textAlign = "right";
+    ctx.font = `700 ${compact ? 9 : 11}px ui-monospace, Consolas, monospace`;
+    if (compact) {
+      ctx.fillStyle = threeDayAverage == null ? "#89938f" : (threeDayAverage >= 0 ? "#12a66a" : "#d84d4d");
+      ctx.fillText(threeDayAverage == null ? "N/A" : `${threeDayAverage >= 0 ? "+" : ""}${threeDayAverage.toFixed(2)}%`, width - 125, y);
+      ctx.fillStyle = colour;
+      ctx.fillText(`${change >= 0 ? "+" : ""}${change.toFixed(2)}%`, width - 65, y);
+    } else {
+      ctx.fillStyle = previousDay == null ? "#89938f" : (previousDay >= 0 ? "#12a66a" : "#d84d4d");
+      ctx.fillText(previousDay == null ? "N/A" : `${previousDay >= 0 ? "+" : ""}${previousDay.toFixed(2)}%`, width - 342, y);
+      ctx.fillStyle = dayBefore == null ? "#89938f" : (dayBefore >= 0 ? "#12a66a" : "#d84d4d");
+      ctx.fillText(dayBefore == null ? "N/A" : `${dayBefore >= 0 ? "+" : ""}${dayBefore.toFixed(2)}%`, width - 252, y);
+      ctx.fillStyle = colour;
+      ctx.fillText(`${change >= 0 ? "+" : ""}${change.toFixed(2)}%`, width - 164, y);
+      ctx.fillStyle = hourly == null ? "#89938f" : (hourly >= 0 ? "#12a66a" : "#d84d4d");
+      ctx.fillText(hourly == null ? "N/A" : `${hourly >= 0 ? "+" : ""}${hourly.toFixed(2)}%`, width - 83, y);
+    }
+    ctx.fillStyle = "#64736e"; ctx.font = `${compact ? 9 : 10}px ui-monospace, Consolas, monospace`;
     ctx.fillText(aud(item.priceAud, item.priceAud < 1 ? 6 : 2), width - 4, y);
   });
 }

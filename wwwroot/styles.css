@@ -199,7 +199,8 @@ button span { margin-left: 18px; }
 .gainers-card, .wallet-card { width: 100%; }
 .data-note { margin: 7px 0 14px; max-width: 900px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .gainers-scroll, .wallet-scroll { max-height: 620px; overflow: auto; border-top: 1px solid var(--line); }
-.gainers-scroll canvas { min-width: 840px; margin-top: 0; }
+.gainers-scroll { overflow-x: hidden; }
+.gainers-scroll canvas { min-width: 0; margin-top: 0; }
 .wallet-scroll canvas { min-width: 620px; margin-top: 0; }
 .gainers-scroll canvas { cursor: pointer; }
 .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
