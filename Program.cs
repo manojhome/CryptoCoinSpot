@@ -136,16 +136,19 @@ app.MapGet("/api/history/{coin}", async (
     try
     {
         coin = CoinSpotClient.NormalizeCoin(coin);
-        var history = await dailyPrices.GetOrBackfillAllTimeAsync(
+        var latestCompletedUtcDay = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+        var history = await dailyPrices.GetOrRefreshFiveYearsAsync(
             coin,
-            token => market.GetAllDailyAsync(coin, "aud", token),
+            latestCompletedUtcDay,
+            token => market.GetFiveYearDailyAsync(coin, "aud", token),
+            token => market.GetRecentDailyAsync(coin, 32, "aud", token),
             cancellationToken);
         return Results.Ok(new
         {
             coin,
             source = history.Updated
-                ? "KuCoin available history + permanent local file"
-                : "permanent local all-time file",
+                ? "KuCoin five-year history + permanent local file"
+                : "permanent local five-year file",
             daily = history.Candles.Select(x => new
             {
                 time = x.Time,

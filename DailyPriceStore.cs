@@ -14,9 +14,11 @@ public sealed class DailyPriceStore(string dataDirectory)
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public async Task<DailyPriceLoad> GetOrBackfillAllTimeAsync(
+    public async Task<DailyPriceLoad> GetOrRefreshFiveYearsAsync(
         string coin,
-        Func<CancellationToken, Task<IReadOnlyList<Candle>>> fetchAllDaily,
+        DateOnly latestCompletedDay,
+        Func<CancellationToken, Task<IReadOnlyList<Candle>>> fetchFiveYears,
+        Func<CancellationToken, Task<IReadOnlyList<Candle>>> fetchRecentDaily,
         CancellationToken cancellationToken)
     {
         coin = CoinSpotClient.NormalizeCoin(coin);
@@ -29,28 +31,57 @@ public sealed class DailyPriceStore(string dataDirectory)
             var existing = (await ReadFileAsync(path, cancellationToken))
                 .OrderBy(x => x.Time)
                 .ToArray();
+            var cutoffDay = latestCompletedDay.AddYears(-5);
+            var retained = existing
+                .Where(x =>
+                {
+                    var day = DateOnly.FromDateTime(x.Time.UtcDateTime);
+                    return day >= cutoffDay && day <= latestCompletedDay;
+                })
+                .ToArray();
             var markerPath = AllTimeMarkerPath(coin);
-            if (existing.Length > 0 && File.Exists(markerPath))
-                return new DailyPriceLoad(existing, false);
+            var hasFiveYearBackfill = File.Exists(markerPath);
+            var lastStoredDay = retained.Length == 0
+                ? (DateOnly?)null
+                : DateOnly.FromDateTime(retained[^1].Time.UtcDateTime);
+            if (hasFiveYearBackfill && lastStoredDay >= latestCompletedDay)
+            {
+                if (!existing.SequenceEqual(retained))
+                    await WriteFileAsync(path, retained, cancellationToken);
+                return new DailyPriceLoad(retained, !existing.SequenceEqual(retained));
+            }
 
-            var incoming = await fetchAllDaily(cancellationToken);
-            var existingDays = existing
-                .Select(x => DateOnly.FromDateTime(x.Time.UtcDateTime))
-                .ToHashSet();
-            var additions = incoming
+            IReadOnlyList<Candle> incoming;
+            try
+            {
+                incoming = hasFiveYearBackfill
+                    ? await fetchRecentDaily(cancellationToken)
+                    : await fetchFiveYears(cancellationToken);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested && retained.Length > 0)
+            {
+                if (!existing.SequenceEqual(retained))
+                    await WriteFileAsync(path, retained, cancellationToken);
+                return new DailyPriceLoad(retained, !existing.SequenceEqual(retained));
+            }
+
+            var merged = retained.Concat(incoming)
                 .GroupBy(x => DateOnly.FromDateTime(x.Time.UtcDateTime))
                 .Select(x => x.OrderByDescending(c => c.Time).First())
-                .Where(x => !existingDays.Contains(DateOnly.FromDateTime(x.Time.UtcDateTime)))
-                .OrderBy(x => x.Time)
-                .ToArray();
-            var merged = existing.Concat(additions)
+                .Where(x =>
+                {
+                    var day = DateOnly.FromDateTime(x.Time.UtcDateTime);
+                    return day >= cutoffDay && day <= latestCompletedDay;
+                })
                 .OrderBy(x => x.Time)
                 .ToArray();
 
-            if (additions.Length > 0)
+            var updated = !existing.SequenceEqual(merged);
+            if (updated)
                 await WriteFileAsync(path, merged, cancellationToken);
-            await WriteAllTimeMarkerAsync(markerPath, cancellationToken);
-            return new DailyPriceLoad(merged, additions.Length > 0);
+            if (!hasFiveYearBackfill)
+                await WriteAllTimeMarkerAsync(markerPath, cutoffDay, latestCompletedDay, cancellationToken);
+            return new DailyPriceLoad(merged, updated);
         }
         finally
         {
@@ -153,6 +184,8 @@ public sealed class DailyPriceStore(string dataDirectory)
 
     private static async Task WriteAllTimeMarkerAsync(
         string path,
+        DateOnly from,
+        DateOnly through,
         CancellationToken cancellationToken)
     {
         var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
@@ -160,7 +193,13 @@ public sealed class DailyPriceStore(string dataDirectory)
         {
             await File.WriteAllTextAsync(
                 temporaryPath,
-                JsonSerializer.Serialize(new { completedAt = DateTimeOffset.UtcNow }),
+                JsonSerializer.Serialize(new
+                {
+                    rangeYears = 5,
+                    from,
+                    through,
+                    completedAt = DateTimeOffset.UtcNow
+                }),
                 cancellationToken);
             File.Move(temporaryPath, path, true);
         }

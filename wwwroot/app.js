@@ -1132,7 +1132,7 @@ function drawPullbackAnalysis(allCandles) {
   const averageRange = dailyRanges.reduce((total, value) => total + value.difference, 0) / dailyRanges.length;
   const averageRangePercent = dailyRanges.reduce((total, value) => total + value.percentage, 0) / dailyRanges.length;
   $("dailyRangeAverage").textContent = `Avg ${number(averageRange, 5)} (${averageRangePercent.toFixed(2)}%)`;
-  const periodLabel = selectedPeriod === "all" ? "AllTime" : `${pullbackCandles.length} days`;
+  const periodLabel = selectedPeriod === "all" ? `AllTime · up to 5 years · ${pullbackCandles.length} days` : `${pullbackCandles.length} days`;
   $("pullbackChartRange").textContent = `${periodLabel} · ${aud(Math.min(...dailyLows), 4)} — ${aud(Math.max(...dailyHighs), 4)}`;
   renderStreakMetrics(pullbackCandles);
   const investmentAmount = Number(snapshot?.amount) || 1000;
@@ -1144,7 +1144,7 @@ function drawPullbackAnalysis(allCandles) {
 async function loadAllTimeHistory() {
   const period = $("pullbackPeriod");
   period.disabled = true;
-  $("pullbackChartRange").textContent = "Loading all available daily history…";
+  $("pullbackChartRange").textContent = "Loading up to five years from the permanent daily file…";
   hideError();
   try {
     const response = await fetch(`/api/history/${encodeURIComponent(snapshot.coin)}`);
@@ -1584,6 +1584,11 @@ function drawPriceCandles(canvas, candles, hover = null, markers = null) {
   const step = plotWidth / candles.length;
   const bodyWidth = Math.max(2, Math.min(8, step * .7));
   const priceDigits = max < 1 ? 6 : max < 100 ? 4 : 2;
+  const gaps = candles.slice(1).map((candle, index) =>
+    Math.abs(new Date(candle.time) - new Date(candles[index].time)));
+  const sortedGaps = [...gaps].sort((leftGap, rightGap) => leftGap - rightGap);
+  const medianGap = sortedGaps.length ? sortedGaps[Math.floor(sortedGaps.length / 2)] : 0;
+  const isDailySeries = medianGap >= 20 * 60 * 60 * 1000;
 
   ctx.font = "10px ui-monospace, Consolas, monospace";
   ctx.textBaseline = "middle";
@@ -1636,7 +1641,9 @@ function drawPriceCandles(canvas, candles, hover = null, markers = null) {
   candles.forEach((candle, index) => {
     if (index % labelEvery !== 0 && index !== candles.length - 1) return;
     const time = new Date(candle.time);
-    const label = `${time.toLocaleDateString("en-AU", { day: "2-digit", month: "short" })} ${time.toLocaleTimeString("en-AU", { hour: "2-digit", hour12: false })}`;
+    const label = isDailySeries
+      ? time.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "2-digit", timeZone: "UTC" })
+      : `${time.toLocaleDateString("en-AU", { day: "2-digit", month: "short" })} ${time.toLocaleTimeString("en-AU", { hour: "2-digit", hour12: false })}`;
     const x = left + (index + .5) * step;
     ctx.fillText(label, Math.max(left + 34, Math.min(width - 34, x)), height - 3);
   });
@@ -1663,9 +1670,13 @@ function drawPriceCandles(canvas, candles, hover = null, markers = null) {
     ctx.fillStyle = "#ffffff";
     ctx.fillText(priceLabel, left - 10, hoverY);
 
-    const time = new Date(candle.time).toLocaleString("en-AU", {
-      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false
-    });
+    const time = isDailySeries
+      ? new Date(candle.time).toLocaleDateString("en-AU", {
+          day: "2-digit", month: "short", year: "numeric", timeZone: "UTC"
+        })
+      : new Date(candle.time).toLocaleString("en-AU", {
+          day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false
+        });
     const details = `${time}  O ${aud(candle.open, priceDigits)}  H ${aud(candle.high, priceDigits)}  L ${aud(candle.low, priceDigits)}  C ${aud(candle.close, priceDigits)}`;
     ctx.font = "700 10px ui-monospace, Consolas, monospace";
     const tooltipWidth = Math.min(plotWidth, ctx.measureText(details).width + 18);

@@ -77,7 +77,7 @@ public sealed class MarketDataClient(HttpClient http)
             .ToArray();
     }
 
-    public async Task<IReadOnlyList<Candle>> GetAllDailyAsync(
+    public async Task<IReadOnlyList<Candle>> GetFiveYearDailyAsync(
         string coin, string currency, CancellationToken cancellationToken)
     {
         var symbol = CoinSpotClient.NormalizeCoin(coin);
@@ -90,7 +90,7 @@ public sealed class MarketDataClient(HttpClient http)
             : (decimal?)null;
         var todayUtc = DateTime.UtcNow.Date;
         var windowEnd = new DateTimeOffset(todayUtc, TimeSpan.Zero);
-        var earliest = DateTimeOffset.UnixEpoch;
+        var earliest = windowEnd.AddYears(-5).AddDays(-1);
         var candles = new Dictionary<DateOnly, Candle>();
 
         while (windowEnd > earliest)

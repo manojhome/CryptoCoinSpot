@@ -94,11 +94,12 @@ of the rolling 24H and 1H columns; a missing daily market is displayed as `N/A`
 without removing the coin from the ranking.
 
 CoinSpot's public API exposes current prices and only recent completed orders,
-not five years of OHLC candles. Five-year daily candles therefore come from the
-public Coinbase Exchange API in USD; dashboard hourly and daily candles come from
-KuCoin USDT markets and are converted to AUD using CoinSpot's USDT price. Supported mappings
-for five-year Coinbase history are BTC, ETH, XRP, USDT, SOL, and USDC. Some assets may have less than five years of history
-because the asset or its Coinbase USD market is newer.
+not five years of OHLC candles. CLI five-year daily candles therefore come from
+the public Coinbase Exchange API in USD; dashboard hourly and daily candles come
+from KuCoin USDT markets and are converted to AUD using CoinSpot's USDT price.
+Supported mappings for CLI five-year Coinbase history are BTC, ETH, XRP, USDT,
+SOL, and USDC. Some assets may have less history because the asset or matching
+market is newer.
 
 `history` reports the low/high over the retrieved period, rolling 52-week
 low/high, and the previous completed daily candle's low/high. `--csv` exports all
@@ -136,6 +137,13 @@ Each requested ticker gets its own file. Pullback context uses the latest 365
 stored entries, and can fall back to the local file when the daily provider is
 temporarily unavailable. Generated JSON history files are local runtime data and
 are excluded from Git; `Data/.gitkeep` preserves the directory in the repository.
+
+TimelineData's **AllTime (up to 5 years)** option backfills as much of the latest
+five years as the matching KuCoin market provides into the same permanent coin
+file. Later requests reuse that file; if a new UTC day has completed, only recent
+daily candles are fetched and merged. Entries older than the rolling five-year
+window are removed when AllTime is requested. Daily chart labels use the UTC
+candle date and include the year, avoiding the former local-hour suffix.
 
 ## Stored live transactions
 
