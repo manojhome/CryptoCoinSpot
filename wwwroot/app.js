@@ -2,6 +2,8 @@ const $ = id => document.getElementById(id);
 let snapshot = null;
 let gainersSnapshot = null;
 let selectedGainerCoin = null;
+let gainersSort = { key: "threeDayAverage", direction: "desc" };
+let gainersRefreshedAt = null;
 let walletSnapshot = null;
 let priceHover = null;
 let dailyPercentHover = null;
@@ -795,7 +797,20 @@ $("gainersChart").addEventListener("click", async event => {
   if (!gainersSnapshot?.length || $("analyse").disabled) return;
   const canvas = $("gainersChart");
   const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * canvas.clientWidth / rect.width;
   const y = (event.clientY - rect.top) * canvas.clientHeight / rect.height;
+  if (y < 26) {
+    const sortKey = gainerSortKeyAtPosition(x, canvas.clientWidth);
+    if (!sortKey) return;
+    gainersSort = {
+      key: sortKey,
+      direction: gainersSort.key === sortKey && gainersSort.direction === "desc" ? "asc" : "desc"
+    };
+    gainersSnapshot = sortGainers(gainersSnapshot);
+    drawGainers(gainersSnapshot);
+    updateGainersStatus();
+    return;
+  }
   const rowIndex = Math.floor((y - 26) / 29);
   if (rowIndex < 0) return;
   const selectedCoin = gainersSnapshot[rowIndex];
@@ -1566,14 +1581,83 @@ async function loadGainers() {
     const response = await fetch("/api/gainers");
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Gainers update failed.");
-    gainersSnapshot = data.items;
-    drawGainers(data.items);
-    $("gainersStatus").textContent = `${data.items.length} assets · refreshed ${new Date().toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+    gainersSnapshot = sortGainers(data.items);
+    gainersRefreshedAt = new Date();
+    drawGainers(gainersSnapshot);
+    updateGainersStatus();
   } catch (error) {
     gainersSnapshot = [];
     drawGainers([]);
     $("gainersStatus").textContent = `Unavailable: ${error.message}`;
   }
+}
+
+function gainerThreeDayAverage(item) {
+  if (item.previousDayChangePercent == null || item.dayBeforeChangePercent == null) return null;
+  return (Number(item.change24HoursPercent) + Number(item.previousDayChangePercent) + Number(item.dayBeforeChangePercent)) / 3;
+}
+
+function gainerSortValue(item, key) {
+  if (key === "coin") return item.coin;
+  if (key === "threeDayAverage") return gainerThreeDayAverage(item);
+  return item[key] == null ? null : Number(item[key]);
+}
+
+function sortGainers(items) {
+  const direction = gainersSort.direction === "asc" ? 1 : -1;
+  return [...items].sort((left, right) => {
+    const leftValue = gainerSortValue(left, gainersSort.key);
+    const rightValue = gainerSortValue(right, gainersSort.key);
+    if (leftValue == null && rightValue == null) return left.coin.localeCompare(right.coin);
+    if (leftValue == null) return 1;
+    if (rightValue == null) return -1;
+    const comparison = typeof leftValue === "string"
+      ? leftValue.localeCompare(rightValue)
+      : leftValue - rightValue;
+    return comparison === 0 ? left.coin.localeCompare(right.coin) : comparison * direction;
+  });
+}
+
+function gainerSortLabel() {
+  const labels = {
+    coin: "Coin",
+    threeDayAverage: "3D Avg",
+    previousDayChangePercent: "Prev day",
+    dayBeforeChangePercent: "Day before",
+    change24HoursPercent: "24H",
+    change1HourPercent: "1H",
+    priceAud: "Price"
+  };
+  return `${labels[gainersSort.key]} ${gainersSort.direction === "asc" ? "↑" : "↓"}`;
+}
+
+function updateGainersStatus() {
+  if (!gainersSnapshot) return;
+  const refreshed = gainersRefreshedAt
+    ? ` · refreshed ${gainersRefreshedAt.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`
+    : "";
+  $("gainersStatus").textContent = `${gainersSnapshot.length} assets · sorted ${gainerSortLabel()}${refreshed}`;
+}
+
+function gainerSortKeyAtPosition(x, width) {
+  if (width < 620) {
+    if (x < width - 155) return "coin";
+    if (x < width - 95) return "threeDayAverage";
+    if (x < width - 35) return "change24HoursPercent";
+    return "priceAud";
+  }
+  if (x < 150) return "coin";
+  if (x < width - 297 && x >= width - 390) return "previousDayChangePercent";
+  if (x < width - 208 && x >= width - 297) return "dayBeforeChangePercent";
+  if (x < width - 123 && x >= width - 208) return "change24HoursPercent";
+  if (x < width - 43 && x >= width - 123) return "change1HourPercent";
+  if (x >= width - 43) return "priceAud";
+  return null;
+}
+
+function gainerHeaderLabel(label, key) {
+  if (gainersSort.key !== key) return label;
+  return `${label} ${gainersSort.direction === "asc" ? "↑" : "↓"}`;
 }
 
 function drawGainers(items) {
@@ -1598,18 +1682,18 @@ function drawGainers(items) {
   ctx.fillStyle = "#64736e";
   ctx.font = "700 9px ui-monospace, Consolas, monospace";
   ctx.textAlign = "left";
-  ctx.fillText("COIN", 36, 12);
+  ctx.fillText(gainerHeaderLabel("COIN", "coin"), 36, 12);
   ctx.textAlign = "right";
   if (compact) {
-    ctx.fillText("3D AVG", width - 125, 12);
-    ctx.fillText("24H", width - 65, 12);
-    ctx.fillText("PRICE", width - 4, 12);
+    ctx.fillText(gainerHeaderLabel("3D AVG", "threeDayAverage"), width - 125, 12);
+    ctx.fillText(gainerHeaderLabel("24H", "change24HoursPercent"), width - 65, 12);
+    ctx.fillText(gainerHeaderLabel("PRICE", "priceAud"), width - 4, 12);
   } else {
-    ctx.fillText("PREV DAY", width - 342, 12);
-    ctx.fillText("DAY BEFORE", width - 252, 12);
-    ctx.fillText("24H", width - 164, 12);
-    ctx.fillText("1H", width - 83, 12);
-    ctx.fillText("PRICE", width - 4, 12);
+    ctx.fillText(gainerHeaderLabel("PREV DAY", "previousDayChangePercent"), width - 342, 12);
+    ctx.fillText(gainerHeaderLabel("DAY BEFORE", "dayBeforeChangePercent"), width - 252, 12);
+    ctx.fillText(gainerHeaderLabel("24H", "change24HoursPercent"), width - 164, 12);
+    ctx.fillText(gainerHeaderLabel("1H", "change1HourPercent"), width - 83, 12);
+    ctx.fillText(gainerHeaderLabel("PRICE", "priceAud"), width - 4, 12);
   }
   ctx.strokeStyle = "rgba(100,115,110,.2)";
   ctx.beginPath(); ctx.moveTo(0, headerHeight - 1); ctx.lineTo(width, headerHeight - 1); ctx.stroke();
@@ -1632,7 +1716,7 @@ function drawGainers(items) {
       ctx.fillRect(0, y - 13, width, rowHeight);
     }
     ctx.fillStyle = "#64736e"; ctx.textAlign = "right";
-    ctx.fillText(`#${item.rank}`, 28, y);
+    ctx.fillText(`#${index + 1}`, 28, y);
     ctx.fillStyle = "#10201b"; ctx.textAlign = "left"; ctx.font = "700 11px ui-monospace, Consolas, monospace";
     ctx.fillText(item.coin, 36, y);
     ctx.font = "11px ui-monospace, Consolas, monospace";
