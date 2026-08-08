@@ -170,6 +170,42 @@ app.MapGet("/api/history/{coin}", async (
     }
 });
 
+app.MapGet("/api/intraday/{coin}", async (
+    string coin,
+    MarketDataClient market,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await market.GetThreeHourCandlesAsync(coin, "aud", cancellationToken);
+        return Results.Ok(new
+        {
+            coin = CoinSpotClient.NormalizeCoin(coin),
+            periodHours = 3,
+            intervalMinutes = 5,
+            source = result.Source,
+            candles = result.Candles.Select(x => new
+            {
+                time = x.Time,
+                x.Open,
+                x.High,
+                x.Low,
+                x.Close,
+                x.Volume
+            }),
+            refreshedAt = DateTimeOffset.UtcNow
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
 app.MapGet("/api/gainers", async (
     MarketDataClient market,
     Microsoft.Extensions.Caching.Memory.IMemoryCache cache,

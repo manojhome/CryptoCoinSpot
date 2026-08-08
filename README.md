@@ -147,6 +147,12 @@ candle date and include the year, avoiding the former local-hour suffix.
 
 ## Stored live transactions
 
+Immediately above the permanent live-order history, the dashboard shows a
+half-width three-hour candlestick chart and a half-width live price tape. The
+chart uses CoinSpot five-minute history with a matching KuCoin fallback. The
+Live button records CoinSpot's current AUD price once per minute, colours rises
+green and falls red, and keeps the newest 15 observations; Stop pauses polling.
+
 Every successful live Buy, Sell, or AutoSell submitted by this app is appended
 to `Data/live-trades.json`, including prompt-free whole-row sells. The transaction
 container uses weighted-average cost

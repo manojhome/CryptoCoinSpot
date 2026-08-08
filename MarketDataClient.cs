@@ -60,6 +60,32 @@ public sealed class MarketDataClient(HttpClient http)
             symbol, "1hour", DateTimeOffset.UtcNow.AddDays(-days), currency, cancellationToken);
     }
 
+    public async Task<(IReadOnlyList<Candle> Candles, string Source)> GetThreeHourCandlesAsync(
+        string coin, string currency, CancellationToken cancellationToken)
+    {
+        var symbol = CoinSpotClient.NormalizeCoin(coin);
+        var now = DateTimeOffset.UtcNow;
+        var from = now.AddHours(-3);
+        try
+        {
+            var candles = await GetCoinSpotChartCandlesAsync(
+                symbol, 5, from.AddMinutes(-5), now, cancellationToken);
+            var selected = candles.Where(x => x.Time >= from).ToArray();
+            if (selected.Length >= 2)
+                return (selected, "CoinSpot five-minute chart history");
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Fall through to the matching KuCoin market when CoinSpot has no chart history.
+        }
+
+        var fallback = await GetKuCoinCandlesAsync(
+            symbol, "5min", from.AddMinutes(-5), currency, cancellationToken);
+        return (
+            fallback.Where(x => x.Time >= from).ToArray(),
+            "CoinSpot-listed KuCoin five-minute market converted to AUD");
+    }
+
     public Task<decimal> GetCoinSpotCurrentPriceAsync(
         string coin,
         CancellationToken cancellationToken) =>
@@ -321,6 +347,45 @@ public sealed class MarketDataClient(HttpClient http)
         {
             return null;
         }
+    }
+
+    private async Task<IReadOnlyList<Candle>> GetCoinSpotChartCandlesAsync(
+        string coin,
+        int resolutionMinutes,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken)
+    {
+        using var response = await GetWithRateLimitRetryAsync(
+            $"https://www.coinspot.com.au/charts/history?symbol={Uri.EscapeDataString(coin)}" +
+            $"&resolution={resolutionMinutes}&from={from.ToUnixTimeSeconds()}&to={to.ToUnixTimeSeconds()}",
+            cancellationToken);
+        var text = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"CoinSpot chart returned {(int)response.StatusCode}: {text}");
+
+        using var json = JsonDocument.Parse(text);
+        var root = json.RootElement;
+        if (!root.TryGetProperty("s", out var status) ||
+            !string.Equals(status.GetString(), "ok", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"CoinSpot returned no chart history for {coin}.");
+
+        var times = root.GetProperty("t").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+        var opens = root.GetProperty("o").EnumerateArray().Select(ReadDecimal).ToArray();
+        var highs = root.GetProperty("h").EnumerateArray().Select(ReadDecimal).ToArray();
+        var lows = root.GetProperty("l").EnumerateArray().Select(ReadDecimal).ToArray();
+        var closes = root.GetProperty("c").EnumerateArray().Select(ReadDecimal).ToArray();
+        if (times.Length == 0 || opens.Length != times.Length || highs.Length != times.Length ||
+            lows.Length != times.Length || closes.Length != times.Length)
+            throw new InvalidOperationException($"CoinSpot returned incomplete chart history for {coin}.");
+
+        return Enumerable.Range(0, times.Length)
+            .Select(index => new Candle(
+                DateTimeOffset.FromUnixTimeSeconds(times[index]),
+                opens[index], highs[index], lows[index], closes[index]))
+            .Where(x => x.Open > 0 && x.High > 0 && x.Low > 0 && x.Close > 0)
+            .OrderBy(x => x.Time)
+            .ToArray();
     }
 
     private async Task<decimal?> GetKuCoinOneHourChangeAsync(

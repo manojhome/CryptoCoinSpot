@@ -21,6 +21,14 @@ const liveTradeQuotes = { buy: null, sell: null };
 let liveSellAmountType = "coin";
 let liveTransactionsSnapshot = [];
 const liveRowSellQuotes = new Map();
+let intradayCandles = [];
+let intradayHover = null;
+let liveTapeSamples = [];
+let liveTapeCoin = null;
+let liveTapeTimer = null;
+let liveTapeRunning = false;
+let liveTapeInFlight = false;
+let liveTapeSessionId = 0;
 const COIN_AMOUNT_EPSILON = 0.00000001;
 
 const aud = (n, digits = 4) => `$${Number(n).toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
@@ -40,6 +48,8 @@ $("liveSellAudAmount").addEventListener("input", () => selectSellAmountType("aud
 $("refreshCurrentPrice").addEventListener("click", refreshCurrentSellQuotePrice);
 $("refreshHourlyTrend").addEventListener("click", () => refreshTrendMetric("hourly"));
 $("refreshDailyTrend").addEventListener("click", () => refreshTrendMetric("daily"));
+$("liveTapeStart").addEventListener("click", startLiveTape);
+$("liveTapeStop").addEventListener("click", () => stopLiveTape());
 $("pullbackPeriod").addEventListener("change", async () => {
   pullbackHover = null;
   if (!snapshot) return;
@@ -598,6 +608,115 @@ function transactionFeeAud(transaction) {
     ? storedFee
     : Number(transaction.totalAud) * .01;
 }
+
+async function loadIntradayCandles(coin) {
+  const status = $("intradayStatus");
+  status.textContent = `Loading ${coin}…`;
+  intradayHover = null;
+  try {
+    const response = await fetch(`/api/intraday/${encodeURIComponent(coin)}`, { cache: "no-store" });
+    const data = await readApiJson(response, "Three-hour candles");
+    if (!response.ok) throw new Error(data.error || data.detail || "Three-hour candles failed.");
+    intradayCandles = data.candles || [];
+    if (!intradayCandles.length) throw new Error("No recent candles were returned.");
+    drawPriceCandles($("intradayChart"), intradayCandles, intradayHover);
+    const provider = data.source.startsWith("CoinSpot") && !data.source.includes("KuCoin")
+      ? "CoinSpot"
+      : "KuCoin fallback";
+    status.textContent = `${coin} · ${intradayCandles.length} candles · ${provider} · ${new Date(data.refreshedAt).toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+  } catch (error) {
+    intradayCandles = [];
+    const canvas = $("intradayChart");
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    status.textContent = `Unavailable: ${error.message}`;
+  }
+}
+
+function renderLiveTape() {
+  const body = $("liveTapeBody");
+  if (!liveTapeSamples.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 4;
+    cell.textContent = "No live price transactions yet.";
+    row.appendChild(cell);
+    body.replaceChildren(row);
+    return;
+  }
+
+  const rows = liveTapeSamples.map(sample => {
+    const row = document.createElement("tr");
+    row.className = `tape-${sample.direction}`;
+    appendTransactionCell(row, new Date(sample.time).toLocaleTimeString("en-AU", {
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }));
+    appendTransactionCell(row, sample.coin);
+    appendTransactionCell(row, aud(sample.price, sample.price < 1 ? 8 : 2));
+    const move = sample.changePercent == null
+      ? "FIRST"
+      : `${sample.changePercent >= 0 ? "↑ +" : "↓ "}${sample.changePercent.toFixed(3)}%`;
+    appendTransactionCell(row, move);
+    return row;
+  });
+  body.replaceChildren(...rows);
+}
+
+async function refreshLiveTape(sessionId) {
+  if (!liveTapeRunning || liveTapeInFlight || sessionId !== liveTapeSessionId) return;
+  liveTapeInFlight = true;
+  try {
+    const response = await fetch(`/api/coinspot/price/${encodeURIComponent(liveTapeCoin)}`, { cache: "no-store" });
+    const data = await readApiJson(response, "Live CoinSpot price");
+    if (!response.ok) throw new Error(data.error || data.detail || "Live CoinSpot price failed.");
+    if (!liveTapeRunning || sessionId !== liveTapeSessionId) return;
+    const price = Number(data.price);
+    const previous = liveTapeSamples[0]?.price;
+    const changePercent = Number.isFinite(previous) && previous > 0 ? (price / previous - 1) * 100 : null;
+    const direction = changePercent == null ? "flat" : changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";
+    liveTapeSamples.unshift({ coin: data.coin, price, time: Date.now(), changePercent, direction });
+    liveTapeSamples = liveTapeSamples.slice(0, 15);
+    renderLiveTape();
+    $("liveTapeStatus").textContent = `Live · ${liveTapeSamples.length}/15 · updated ${new Date().toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} · next update in 1 minute`;
+  } catch (error) {
+    if (liveTapeRunning && sessionId === liveTapeSessionId)
+      $("liveTapeStatus").textContent = `Live update failed: ${error.message} · retrying in 1 minute`;
+  } finally {
+    liveTapeInFlight = false;
+  }
+}
+
+async function startLiveTape() {
+  const coin = $("coin").value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,10}$/.test(coin)) {
+    $("liveTapeStatus").textContent = "Enter a valid coin ticker before starting live updates.";
+    return;
+  }
+  stopLiveTape(false);
+  liveTapeCoin = coin;
+  liveTapeSamples = [];
+  liveTapeRunning = true;
+  const sessionId = ++liveTapeSessionId;
+  renderLiveTape();
+  $("liveTapeStart").disabled = true;
+  $("liveTapeStop").disabled = false;
+  $("liveTapeStatus").textContent = `Starting live ${coin} updates…`;
+  await refreshLiveTape(sessionId);
+  if (!liveTapeRunning || sessionId !== liveTapeSessionId) return;
+  liveTapeTimer = setInterval(() => refreshLiveTape(sessionId), 60_000);
+}
+
+function stopLiveTape(updateStatus = true) {
+  liveTapeRunning = false;
+  liveTapeInFlight = false;
+  liveTapeSessionId++;
+  if (liveTapeTimer) clearInterval(liveTapeTimer);
+  liveTapeTimer = null;
+  $("liveTapeStart").disabled = false;
+  $("liveTapeStop").disabled = true;
+  if (updateStatus)
+    $("liveTapeStatus").textContent = `Stopped · ${liveTapeSamples.length} of 15 price transactions retained.`;
+}
+
 $("priceChart").addEventListener("mousemove", event => {
   if (!snapshot?.hourly?.length) return;
   const canvas = $("priceChart");
@@ -617,6 +736,24 @@ $("priceChart").addEventListener("mousemove", event => {
 $("priceChart").addEventListener("mouseleave", () => {
   priceHover = null;
   if (snapshot) drawPriceCandles($("priceChart"), snapshot.hourly);
+});
+$("intradayChart").addEventListener("mousemove", event => {
+  if (!intradayCandles.length) return;
+  const canvas = $("intradayChart");
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * canvas.clientWidth / rect.width;
+  const y = (event.clientY - rect.top) * canvas.clientHeight / rect.height;
+  const left = 82, right = 12, top = 14, bottom = 34;
+  const step = (canvas.clientWidth - left - right) / intradayCandles.length;
+  const index = Math.floor((x - left) / step);
+  intradayHover = index < 0 || index >= intradayCandles.length || y < top || y > canvas.clientHeight - bottom
+    ? null
+    : { index, y };
+  drawPriceCandles(canvas, intradayCandles, intradayHover);
+});
+$("intradayChart").addEventListener("mouseleave", () => {
+  intradayHover = null;
+  if (intradayCandles.length) drawPriceCandles($("intradayChart"), intradayCandles);
 });
 $("dailyPercentChart").addEventListener("mousemove", event => {
   if (!dailyPercentData.length) return;
@@ -675,6 +812,7 @@ window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
   if (gainersSnapshot) drawGainers(gainersSnapshot);
   if (walletSnapshot) drawWallet(walletSnapshot);
+  if (intradayCandles.length) drawPriceCandles($("intradayChart"), intradayCandles, intradayHover);
 });
 
 async function analyse(isAutomatic = false) {
@@ -696,6 +834,8 @@ async function analyse(isAutomatic = false) {
     if (!isAutomatic || !snapshot || snapshot.coin !== data.coin || snapshot.amount !== data.amount) entryPrice = data.currentPrice;
     snapshot = data;
     render(data);
+    loadIntradayCandles(data.coin);
+    if (liveTapeRunning && liveTapeCoin !== data.coin) startLiveTape();
     nextRefresh = Date.now() + 60 * 60 * 1000;
     if (!timer) timer = setInterval(tick, 1000);
   } catch (error) {
@@ -1596,6 +1736,7 @@ function drawPriceCandles(canvas, candles, hover = null, markers = null) {
   const sortedGaps = [...gaps].sort((leftGap, rightGap) => leftGap - rightGap);
   const medianGap = sortedGaps.length ? sortedGaps[Math.floor(sortedGaps.length / 2)] : 0;
   const isDailySeries = medianGap >= 20 * 60 * 60 * 1000;
+  const isMinuteSeries = medianGap > 0 && medianGap <= 10 * 60 * 1000;
 
   ctx.font = "10px ui-monospace, Consolas, monospace";
   ctx.textBaseline = "middle";
@@ -1650,7 +1791,9 @@ function drawPriceCandles(canvas, candles, hover = null, markers = null) {
     const time = new Date(candle.time);
     const label = isDailySeries
       ? time.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "2-digit", timeZone: "UTC" })
-      : `${time.toLocaleDateString("en-AU", { day: "2-digit", month: "short" })} ${time.toLocaleTimeString("en-AU", { hour: "2-digit", hour12: false })}`;
+      : isMinuteSeries
+        ? time.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false })
+        : `${time.toLocaleDateString("en-AU", { day: "2-digit", month: "short" })} ${time.toLocaleTimeString("en-AU", { hour: "2-digit", hour12: false })}`;
     const x = left + (index + .5) * step;
     ctx.fillText(label, Math.max(left + 34, Math.min(width - 34, x)), height - 3);
   });

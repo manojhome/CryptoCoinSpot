@@ -307,6 +307,34 @@
 
     </section>
 
+    <section class="intraday-live-grid" aria-label="Three-hour candles and live minute transactions">
+      <article class="chart-card intraday-chart-card" aria-labelledby="intradayHeading">
+        <div class="card-head">
+          <div><p class="label">LIVE MARKET / LAST 3 HOURS</p><h2 id="intradayHeading">Three-hour candles</h2></div>
+          <span id="intradayStatus">Loading candles…</span>
+        </div>
+        <p class="data-note">Five-minute AUD candles from CoinSpot chart history, with a matching KuCoin market fallback.</p>
+        <canvas id="intradayChart" aria-label="Last three hours green and red five-minute candlestick chart"></canvas>
+      </article>
+
+      <article class="chart-card live-tape-card" aria-labelledby="liveTapeHeading">
+        <div class="live-tape-heading">
+          <div><p class="label">COINSPOT / EVERY MINUTE</p><h2 id="liveTapeHeading">Current transactions</h2></div>
+          <div class="live-tape-controls">
+            <button id="liveTapeStart" type="button">Live</button>
+            <button id="liveTapeStop" type="button" disabled>Stop</button>
+          </div>
+        </div>
+        <p id="liveTapeStatus" class="data-note">Stopped · start live updates to record the current CoinSpot price every minute.</p>
+        <div class="live-tape-table-wrap">
+          <table class="live-tape-table">
+            <thead><tr><th>Time</th><th>Coin</th><th>Price</th><th>Move</th></tr></thead>
+            <tbody id="liveTapeBody"><tr><td colspan="4">No live price transactions yet.</td></tr></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
     <article class="chart-card live-transactions-card" aria-labelledby="liveTransactionsHeading">
       <div class="card-head">
         <div><p class="label">PERMANENT DATA / LIVE ORDERS</p><h2 id="liveTransactionsHeading">My buy and sell transactions</h2></div>
