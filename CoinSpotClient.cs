@@ -54,7 +54,8 @@ public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiS
                     ReadDecimal(value.GetProperty("rate")));
             }))
             .Where(x => x.Balance > 0 || x.AudBalance > 0)
-            .OrderByDescending(x => x.AudBalance)
+            .OrderByDescending(x => x.Coin == "AUD")
+            .ThenByDescending(x => x.AudBalance)
             .ToArray();
     }
 

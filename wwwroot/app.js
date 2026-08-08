@@ -1508,11 +1508,17 @@ async function loadWallet() {
     const response = await fetch("/api/coinspot/wallet", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Wallet update failed.");
-    walletSnapshot = data.items;
-    drawWallet(data.items);
+    const walletItems = [...data.items].sort((left, right) => {
+      if (left.coin === "AUD") return -1;
+      if (right.coin === "AUD") return 1;
+      return Number(right.audBalance) - Number(left.audBalance);
+    });
+    walletSnapshot = walletItems;
+    drawWallet(walletItems);
     updateSellWalletSummary();
     drawLiveTransactions();
-    $("walletStatus").textContent = `${data.items.length} coins · ${aud(data.totalAud, 2)}`;
+    const investedCoinCount = walletItems.filter(item => item.coin !== "AUD").length;
+    $("walletStatus").textContent = `${investedCoinCount} coins · ${aud(data.totalAud, 2)}`;
   } catch (error) {
     walletSnapshot = null;
     updateSellWalletSummary();
@@ -1543,6 +1549,7 @@ function drawWallet(items) {
   items.forEach((item, index) => {
     const y = 16 + index * rowHeight;
     const value = Number(item.audBalance);
+    const isAvailableAud = item.coin === "AUD";
     if (index % 2) {
       ctx.fillStyle = "rgba(16,32,27,.025)";
       ctx.fillRect(0, y - 16, width, rowHeight);
@@ -1550,8 +1557,8 @@ function drawWallet(items) {
     ctx.fillStyle = "#10201b";
     ctx.textAlign = "left";
     ctx.font = "700 11px ui-monospace, Consolas, monospace";
-    ctx.fillText(item.coin, 8, y);
-    ctx.fillStyle = "#12a66a";
+    ctx.fillText(isAvailableAud ? "AUD CASH" : item.coin, 8, y);
+    ctx.fillStyle = isAvailableAud ? "#d97706" : "#12a66a";
     ctx.fillRect(labelWidth, y - 8, Math.max(2, value / maxValue * barWidth), 16);
     ctx.textAlign = "right";
     ctx.fillStyle = "#10201b";
@@ -1559,7 +1566,7 @@ function drawWallet(items) {
     ctx.fillText(aud(value, 2), width - 4, y - 5);
     ctx.fillStyle = "#64736e";
     ctx.font = "10px ui-monospace, Consolas, monospace";
-    ctx.fillText(`${number(item.balance, 8)} coins`, width - 4, y + 8);
+    ctx.fillText(isAvailableAud ? "available cash" : `${number(item.balance, 8)} coins`, width - 4, y + 8);
   });
 }
 
