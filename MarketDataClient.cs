@@ -200,12 +200,24 @@ public sealed class MarketDataClient(HttpClient http)
             x => x.Coin, x => x, StringComparer.OrdinalIgnoreCase);
 
         return topGainers
+            .Select(x => new
+            {
+                Candidate = x,
+                Changes = changesByCoin[x.Coin],
+                ThreeDayAverage = changesByCoin[x.Coin].PreviousDay is decimal previousDay &&
+                                  changesByCoin[x.Coin].DayBefore is decimal dayBefore
+                    ? (x.Change + previousDay + dayBefore) / 3m
+                    : (decimal?)null
+            })
+            .OrderByDescending(x => x.ThreeDayAverage.HasValue)
+            .ThenByDescending(x => x.ThreeDayAverage)
+            .ThenByDescending(x => x.Candidate.Change)
             .Select((x, index) => new MarketGainer(
-                index + 1, x.Coin, x.Name, x.Price,
-                changesByCoin[x.Coin].PreviousDay,
-                changesByCoin[x.Coin].DayBefore,
-                x.Change,
-                changesByCoin[x.Coin].OneHour))
+                index + 1, x.Candidate.Coin, x.Candidate.Name, x.Candidate.Price,
+                x.Changes.PreviousDay,
+                x.Changes.DayBefore,
+                x.Candidate.Change,
+                x.Changes.OneHour))
             .ToArray();
     }
 

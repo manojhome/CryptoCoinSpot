@@ -178,7 +178,7 @@ app.MapGet("/api/gainers", async (
     try
     {
         var gainers = await cache.GetOrCreateAsync(
-            "coinspot-top-50-gainers-v2",
+            "coinspot-top-50-gainers-v3",
             async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
@@ -187,7 +187,7 @@ app.MapGet("/api/gainers", async (
         return Results.Ok(new
         {
             period = "24h",
-            source = "CoinSpot website coin selection; previous-day and day-before completed close-to-close changes from KuCoin daily candles; 1-hour change from CoinSpot 5-minute chart history with KuCoin 1-minute fallback; direct CoinSpot AUD prices where published; 24-hour change from matching KuCoin USDT markets",
+            source = "CoinSpot website coin selection; ranked high-to-low by the average of 24-hour, previous-day and day-before percentage changes; completed daily close-to-close changes from KuCoin daily candles; 1-hour change from CoinSpot 5-minute chart history with KuCoin 1-minute fallback; direct CoinSpot AUD prices where published; 24-hour change from matching KuCoin USDT markets",
             items = gainers ?? []
         });
     }
