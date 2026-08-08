@@ -250,7 +250,6 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .control-panel { grid-template-columns: 1fr 1fr; }
   .control-panel button { grid-column: 1 / -1; }
   .bottom-charts { grid-template-columns: 1fr; }
-  .intraday-live-grid { grid-template-columns: 1fr; }
   .live-trade-grid { grid-template-columns: 1fr; }
   .transaction-summaries { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .streak-metrics { grid-template-columns: repeat(3, 1fr); }
