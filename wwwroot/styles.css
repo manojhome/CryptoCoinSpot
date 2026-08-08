@@ -104,6 +104,7 @@ button span { margin-left: 18px; }
 .transaction-summary.loss > strong { color: var(--red); }
 .transaction-table-wrap { max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
 .transaction-table { min-width: 1280px; margin-top: 0; }
+.transaction-current-price { min-width: 170px; }
 .transaction-selectable-row { cursor: pointer; }
 .transaction-selectable-row:hover { background: rgba(200,240,108,.14); }
 .transaction-selectable-row:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }

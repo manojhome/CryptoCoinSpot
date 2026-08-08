@@ -320,7 +320,7 @@ function drawLiveTransactions() {
   if (!liveTransactionsSnapshot.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 10;
+    cell.colSpan = 11;
     cell.textContent = "No live transactions recorded through this app yet.";
     row.appendChild(cell); body.appendChild(row);
     return;
@@ -429,7 +429,7 @@ function drawLiveTransactions() {
   if (!displayedTransactions.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 10;
+    cell.colSpan = 11;
     cell.textContent = "All sold transactions are hidden.";
     row.appendChild(cell); body.appendChild(row);
     return;
@@ -465,6 +465,13 @@ function drawLiveTransactions() {
         const note = document.createElement("small"); note.textContent = pnl.label; pnlCell.appendChild(note);
       }
       row.appendChild(pnlCell);
+      const currentPriceCell = document.createElement("td");
+      currentPriceCell.className = "transaction-current-price";
+      const currentPrice = document.createElement("small");
+      currentPrice.className = "transaction-row-price";
+      currentPrice.textContent = "Loading…";
+      currentPriceCell.appendChild(currentPrice);
+      row.appendChild(currentPriceCell);
       const saleNowCell = document.createElement("td");
       const saleNow = transaction.side === "buy" ? saleNowByTransaction.get(transaction) : null;
       if (saleNow?.value != null) {
@@ -474,6 +481,11 @@ function drawLiveTransactions() {
       } else {
         saleNowCell.textContent = transaction.side === "buy" ? saleNow?.status || "N/A" : "—";
       }
+      liveRowPriceElements.set(liveRowTransactionKey(transaction), {
+        element: currentPrice,
+        transaction,
+        saleNow
+      });
       row.appendChild(createLiveRowSellCell(transaction, saleNow, saleNowCell));
       row.appendChild(saleNowCell); body.appendChild(row);
     });
@@ -500,12 +512,8 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   chartButton.className = "row-chart-button";
   chartButton.textContent = "24h chart";
   chartButton.addEventListener("click", () => openLiveRowChart(transaction.coin));
-  const minutePrice = document.createElement("small");
-  minutePrice.className = "transaction-row-price";
-  minutePrice.textContent = "Minute price: loading…";
-  liveRowPriceElements.set(key, { element: minutePrice, transaction, saleNow });
   if (transaction.side !== "buy") {
-    cell.append(chartButton, minutePrice);
+    cell.appendChild(chartButton);
     return cell;
   }
   if (!saleNow?.sellableAmount) {
@@ -513,7 +521,7 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
     const status = document.createElement("small");
     status.className = "transaction-row-quote";
     status.textContent = saleNow?.status || "Sell unavailable";
-    cell.append(status, minutePrice);
+    cell.appendChild(status);
     return cell;
   }
 
@@ -552,7 +560,7 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   monitorStatus.textContent = monitor
     ? `AUTO +${monitor.target}% armed · checked every 5 minutes while this page is open`
     : "Choose one automatic net-profit target";
-  cell.append(buttons, targetButtons, minutePrice, monitorStatus, quoteStatus);
+  cell.append(buttons, targetButtons, monitorStatus, quoteStatus);
 
   const existing = liveRowSellQuotes.get(key);
   if (existing && new Date(existing.expiresAt).getTime() > Date.now()) {
