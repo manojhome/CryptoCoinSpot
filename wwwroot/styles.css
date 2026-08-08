@@ -130,6 +130,9 @@ button span { margin-left: 18px; }
 .auto-profit-status { color: #8a5a11; }
 .transaction-row-price.profit { color: var(--green-dark); }
 .transaction-row-price.loss, .transaction-row-price.failure { color: var(--red); }
+.transaction-row-price > strong, .transaction-row-price > span { display: block; }
+.transaction-row-price > strong { font-size: 11px; }
+.transaction-row-price > span { margin-top: 3px; color: var(--muted); font-size: 8px; white-space: nowrap; }
 .row-chart-button { height: 30px; padding: 0 10px; border: 1px solid var(--green-dark); border-radius: 7px; background: var(--card); color: var(--green-dark); font-size: 9px; white-space: nowrap; }
 .row-chart-modal { width: min(1100px, calc(100vw - 32px)); max-width: none; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); box-shadow: 0 28px 90px rgba(16,32,27,.3); }
 .row-chart-modal::backdrop { background: rgba(16,32,27,.62); backdrop-filter: blur(3px); }

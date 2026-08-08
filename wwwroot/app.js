@@ -644,7 +644,11 @@ async function refreshLiveRowPrices() {
       ? price * Number(item.saleNow.sellableAmount) * .99 / Number(item.saleNow.costAud) * 100 - 100
       : null;
     item.element.className = `transaction-row-price ${netProfit == null ? "" : netProfit >= 0 ? "profit" : "loss"}`;
-    item.element.textContent = `Minute price ${aud(price, price < 1 ? 8 : 2)}${result.source ? ` (${result.source})` : ""}${netProfit == null ? "" : ` · net ${netProfit >= 0 ? "+" : ""}${netProfit.toFixed(2)}%`} · ${updatedAt}`;
+    const priceLine = document.createElement("strong");
+    priceLine.textContent = aud(price, price < 1 ? 8 : 2);
+    const detailLine = document.createElement("span");
+    detailLine.textContent = `${result.source ? `${result.source} · ` : ""}${netProfit == null ? "" : `net ${netProfit >= 0 ? "+" : ""}${netProfit.toFixed(2)}% · `}${updatedAt}`;
+    item.element.replaceChildren(priceLine, detailLine);
   }
 
   const now = Date.now();
