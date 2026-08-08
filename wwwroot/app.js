@@ -23,8 +23,11 @@ let liveTradingStatus = { configured: false, enabled: false, ready: false };
 const liveTradeQuotes = { buy: null, sell: null };
 let liveSellAmountType = "coin";
 let liveTransactionsSnapshot = [];
-let hideSoldTransactions = false;
+let hideSoldTransactions = true;
 const liveRowSellQuotes = new Map();
+const liveRowAutoProfitMonitors = new Map();
+const liveRowPriceElements = new Map();
+let liveRowPriceRefreshInFlight = false;
 let intradayCandles = [];
 let intradayHover = null;
 let rowChartCandles = [];
@@ -299,6 +302,7 @@ async function loadLiveTransactions() {
     if (!response.ok) throw new Error(data.error || data.detail || "Transaction history failed.");
     liveTransactionsSnapshot = data.items || [];
     drawLiveTransactions();
+    refreshLiveRowPrices();
     status.textContent = `${liveTransactionsSnapshot.length} transactions · Data/live-trades.json`;
   } catch (error) {
     liveTransactionsSnapshot = [];
@@ -312,6 +316,7 @@ function drawLiveTransactions() {
   const summaries = $("liveTransactionSummaries");
   body.replaceChildren();
   summaries.replaceChildren();
+  liveRowPriceElements.clear();
   if (!liveTransactionsSnapshot.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
@@ -431,6 +436,16 @@ function drawLiveTransactions() {
   }
   displayedTransactions.forEach(transaction => {
       const row = document.createElement("tr");
+      row.className = "transaction-selectable-row";
+      row.tabIndex = 0;
+      row.setAttribute("aria-label", `Analyse ${transaction.coin} and view transaction actions`);
+      row.addEventListener("click", () => analyseTransactionCoin(transaction.coin));
+      row.addEventListener("keydown", event => {
+        if (event.target !== row) return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        analyseTransactionCoin(transaction.coin);
+      });
       appendTransactionCell(row, new Date(transaction.executedAt).toLocaleString("en-AU"));
       appendTransactionCell(row, transaction.coin);
       const sideCell = document.createElement("td");
@@ -464,6 +479,14 @@ function drawLiveTransactions() {
     });
 }
 
+function analyseTransactionCoin(coin) {
+  const normalizedCoin = String(coin || "").trim().toUpperCase();
+  if (!normalizedCoin) return;
+  $("coin").value = normalizedCoin;
+  syncLiveTradeCoin();
+  analyse();
+}
+
 function liveRowTransactionKey(transaction) {
   return transaction.id || `${transaction.executedAt}|${transaction.coin}|${transaction.coinAmount}`;
 }
@@ -471,13 +494,18 @@ function liveRowTransactionKey(transaction) {
 function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   const cell = document.createElement("td");
   cell.className = "transaction-row-actions";
+  const key = liveRowTransactionKey(transaction);
   const chartButton = document.createElement("button");
   chartButton.type = "button";
   chartButton.className = "row-chart-button";
   chartButton.textContent = "24h chart";
   chartButton.addEventListener("click", () => openLiveRowChart(transaction.coin));
+  const minutePrice = document.createElement("small");
+  minutePrice.className = "transaction-row-price";
+  minutePrice.textContent = "Minute price: loading…";
+  liveRowPriceElements.set(key, { element: minutePrice, transaction, saleNow });
   if (transaction.side !== "buy") {
-    cell.appendChild(chartButton);
+    cell.append(chartButton, minutePrice);
     return cell;
   }
   if (!saleNow?.sellableAmount) {
@@ -485,7 +513,7 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
     const status = document.createElement("small");
     status.className = "transaction-row-quote";
     status.textContent = saleNow?.status || "Sell unavailable";
-    cell.appendChild(status);
+    cell.append(status, minutePrice);
     return cell;
   }
 
@@ -500,15 +528,32 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   sellButton.className = "row-sell-button";
   sellButton.textContent = "Sell whole row";
   sellButton.disabled = true;
+  const targetButtons = document.createElement("div");
+  targetButtons.className = "auto-profit-buttons";
+  for (const target of [2, 3, 4]) {
+    const targetButton = document.createElement("button");
+    targetButton.type = "button";
+    targetButton.className = "auto-profit-button";
+    targetButton.textContent = `Sell +${target}%`;
+    targetButton.disabled = !liveTradingStatus.ready;
+    targetButton.setAttribute("aria-pressed", String(liveRowAutoProfitMonitors.get(key)?.target === target));
+    targetButton.addEventListener("click", () => toggleAutoProfitMonitor(transaction, saleNow, target));
+    targetButtons.appendChild(targetButton);
+  }
   const quoteStatus = document.createElement("small");
   quoteStatus.className = "transaction-row-quote";
   quoteStatus.textContent = liveTradingStatus.configured
     ? "Refresh to obtain a 60-second quote"
     : "Full-access trading API unavailable";
   buttons.append(chartButton, refreshButton, sellButton);
-  cell.append(buttons, quoteStatus);
+  const monitorStatus = document.createElement("small");
+  monitorStatus.className = "auto-profit-status";
+  const monitor = liveRowAutoProfitMonitors.get(key);
+  monitorStatus.textContent = monitor
+    ? `AUTO +${monitor.target}% armed · checked every 5 minutes while this page is open`
+    : "Choose one automatic net-profit target";
+  cell.append(buttons, targetButtons, minutePrice, monitorStatus, quoteStatus);
 
-  const key = liveRowTransactionKey(transaction);
   const existing = liveRowSellQuotes.get(key);
   if (existing && new Date(existing.expiresAt).getTime() > Date.now()) {
     showLiveRowQuote(existing, saleNow, saleNowCell, quoteStatus);
@@ -521,6 +566,133 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   sellButton.addEventListener("click", () => executeLiveRowSell(
     transaction, refreshButton, sellButton, quoteStatus));
   return cell;
+}
+
+function toggleAutoProfitMonitor(transaction, saleNow, target) {
+  const key = liveRowTransactionKey(transaction);
+  const existing = liveRowAutoProfitMonitors.get(key);
+  if (existing?.target === target) {
+    liveRowAutoProfitMonitors.delete(key);
+  } else {
+    liveRowAutoProfitMonitors.set(key, {
+      transaction,
+      saleNow,
+      target,
+      nextCheckAt: 0,
+      busy: false
+    });
+  }
+  drawLiveTransactions();
+  refreshLiveRowPrices();
+}
+
+async function refreshLiveRowPrices() {
+  if (liveRowPriceRefreshInFlight || !liveRowPriceElements.size) return;
+  liveRowPriceRefreshInFlight = true;
+  const entries = [...liveRowPriceElements.entries()];
+  const coins = [...new Set(entries.map(([, item]) => item.transaction.coin))];
+  const prices = new Map();
+  await Promise.all(coins.map(async coin => {
+    try {
+      const response = await fetch(`/api/coinspot/price/${encodeURIComponent(coin)}`, { cache: "no-store" });
+      const data = await readApiJson(response, `${coin} minute price`);
+      if (!response.ok) throw new Error(data.error || data.detail || "Price failed.");
+      prices.set(coin, { price: Number(data.price) });
+    } catch (error) {
+      prices.set(coin, { error: error.message });
+    }
+  }));
+
+  const missingCoins = coins.filter(coin => !Number.isFinite(prices.get(coin)?.price));
+  if (missingCoins.length) {
+    try {
+      const walletResponse = await fetch("/api/coinspot/wallet", { cache: "no-store" });
+      const wallet = await readApiJson(walletResponse, "Minute wallet rates");
+      if (!walletResponse.ok) throw new Error(wallet.error || wallet.detail || "Wallet rates failed.");
+      const walletRates = new Map((wallet.items || []).map(item => [item.coin, Number(item.rateAud)]));
+      for (const coin of missingCoins) {
+        const walletRate = walletRates.get(coin);
+        if (Number.isFinite(walletRate) && walletRate > 0)
+          prices.set(coin, { price: walletRate, source: "wallet rate" });
+      }
+    } catch {
+      // Keep each public-price error when the read-only wallet fallback is unavailable.
+    }
+  }
+
+  const updatedAt = new Date().toLocaleTimeString("en-AU", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  });
+  for (const [key, item] of entries) {
+    if (liveRowPriceElements.get(key)?.element !== item.element) continue;
+    const result = prices.get(item.transaction.coin);
+    if (!Number.isFinite(result?.price)) {
+      item.element.className = "transaction-row-price failure";
+      item.element.textContent = `Minute price unavailable · ${result?.error || "unknown error"}`;
+      continue;
+    }
+    const price = result.price;
+    const netProfit = item.saleNow?.sellableAmount && item.saleNow?.costAud
+      ? price * Number(item.saleNow.sellableAmount) * .99 / Number(item.saleNow.costAud) * 100 - 100
+      : null;
+    item.element.className = `transaction-row-price ${netProfit == null ? "" : netProfit >= 0 ? "profit" : "loss"}`;
+    item.element.textContent = `Minute price ${aud(price, price < 1 ? 8 : 2)}${result.source ? ` (${result.source})` : ""}${netProfit == null ? "" : ` · net ${netProfit >= 0 ? "+" : ""}${netProfit.toFixed(2)}%`} · ${updatedAt}`;
+  }
+
+  const now = Date.now();
+  const due = [...liveRowAutoProfitMonitors.entries()]
+    .filter(([, monitor]) => !monitor.busy && now >= monitor.nextCheckAt);
+  await Promise.all(due.map(([key, monitor]) => checkAutoProfitMonitor(key, monitor)));
+  liveRowPriceRefreshInFlight = false;
+}
+
+async function checkAutoProfitMonitor(key, monitor) {
+  monitor.busy = true;
+  monitor.nextCheckAt = Date.now() + 5 * 60_000;
+  const priceItem = liveRowPriceElements.get(key);
+  try {
+    if (!liveTradingStatus.ready) throw new Error("Live execution is not enabled.");
+    const holding = await fetchCurrentWalletHolding(monitor.transaction.coin);
+    const amount = Math.min(Number(monitor.saleNow.sellableAmount), Number(holding.balance));
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("No wallet balance is available to sell.");
+
+    const quoteResponse = await fetch("/api/coinspot/trading/sell/quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coin: monitor.transaction.coin, amount, amountType: "coin" })
+    });
+    const quote = await readApiJson(quoteResponse, "Automatic profit sell quote");
+    if (!quoteResponse.ok) throw new Error(quote.error || quote.detail || "Automatic sell quote failed.");
+    const allocatedCost = Number(monitor.saleNow.costAud) * Number(quote.amount) / Number(monitor.saleNow.sellableAmount);
+    const quotedNetProfit = Number(quote.amount) * Number(quote.rate) * .99 / allocatedCost * 100 - 100;
+    if (quotedNetProfit + .000001 < monitor.target) {
+      if (priceItem?.element) priceItem.element.title = `Latest executable quote net profit ${quotedNetProfit.toFixed(2)}%; target +${monitor.target}%.`;
+      return;
+    }
+
+    const executeResponse = await fetch("/api/coinspot/trading/sell/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        coin: quote.coin,
+        amount: quote.amount,
+        amountType: "coin",
+        quoteToken: quote.quoteToken,
+        confirmation: `LIVE SELL ${quote.coin}`
+      })
+    });
+    const result = await readApiJson(executeResponse, "Automatic profit sell");
+    if (!executeResponse.ok) throw new Error(result.error || result.detail || "Automatic sell failed.");
+    liveRowAutoProfitMonitors.delete(key);
+    await Promise.all([loadWallet(), loadLiveTransactions()]);
+  } catch (error) {
+    if (priceItem?.element) {
+      priceItem.element.className = "transaction-row-price failure";
+      priceItem.element.title = error.message;
+    }
+  } finally {
+    monitor.busy = false;
+  }
 }
 
 async function openLiveRowChart(coin) {
@@ -2150,3 +2322,4 @@ loadWallet();
 syncLiveTradeCoin();
 loadLiveTradingStatus();
 loadLiveTransactions();
+setInterval(refreshLiveRowPrices, 60_000);

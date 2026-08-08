@@ -95,7 +95,7 @@ button span { margin-left: 18px; }
 .live-tape-table tr.tape-down { color: var(--red); background: rgba(216,77,77,.08); }
 .live-tape-table tr.tape-flat { color: var(--muted); }
 .live-tape-table td:nth-child(3), .live-tape-table td:nth-child(4) { font-weight: 850; }
-.transaction-summaries { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 9px; margin: 12px 0; }
+.transaction-summaries { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 9px; margin: 12px 0; }
 .transaction-summary { padding: 12px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .transaction-summary > strong, .transaction-summary > span { display: block; }
 .transaction-summary > strong { font: 850 16px/1.2 ui-monospace, Consolas, monospace; }
@@ -104,6 +104,9 @@ button span { margin-left: 18px; }
 .transaction-summary.loss > strong { color: var(--red); }
 .transaction-table-wrap { max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
 .transaction-table { min-width: 1280px; margin-top: 0; }
+.transaction-selectable-row { cursor: pointer; }
+.transaction-selectable-row:hover { background: rgba(200,240,108,.14); }
+.transaction-selectable-row:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 .transaction-side { display: inline-block; min-width: 42px; padding: 4px 6px; border-radius: 999px; color: white; text-align: center; font-size: 9px; font-weight: 850; }
 .transaction-side.buy { background: var(--green); }
 .transaction-side.sell { background: var(--red); }
@@ -118,6 +121,13 @@ button span { margin-left: 18px; }
 .transaction-row-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .transaction-row-buttons button { height: 30px; padding: 0 9px; border-radius: 7px; font-size: 9px; white-space: nowrap; }
 .transaction-row-buttons .row-sell-button { color: white; background: var(--red); }
+.auto-profit-buttons { display: flex; gap: 5px; margin-top: 6px; }
+.auto-profit-buttons button { flex: 1; height: 28px; padding: 0 6px; border: 1px solid var(--amber); border-radius: 7px; background: rgba(216,136,24,.1); color: #8a5a11; font-size: 8px; white-space: nowrap; }
+.auto-profit-buttons button[aria-pressed="true"] { color: white; background: var(--amber); }
+.auto-profit-status, .transaction-row-price { display: block; margin-top: 5px; color: var(--muted); font: 650 8px/1.35 ui-monospace, Consolas, monospace; }
+.auto-profit-status { color: #8a5a11; }
+.transaction-row-price.profit { color: var(--green-dark); }
+.transaction-row-price.loss, .transaction-row-price.failure { color: var(--red); }
 .row-chart-button { height: 30px; padding: 0 10px; border: 1px solid var(--green-dark); border-radius: 7px; background: var(--card); color: var(--green-dark); font-size: 9px; white-space: nowrap; }
 .row-chart-modal { width: min(1100px, calc(100vw - 32px)); max-width: none; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); box-shadow: 0 28px 90px rgba(16,32,27,.3); }
 .row-chart-modal::backdrop { background: rgba(16,32,27,.62); backdrop-filter: blur(3px); }

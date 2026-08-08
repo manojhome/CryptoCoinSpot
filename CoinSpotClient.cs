@@ -15,12 +15,42 @@ public sealed class CoinSpotClient(HttpClient http, string? apiKey, string? apiS
 
     public async Task<decimal> GetPriceAsync(string coin, CancellationToken cancellationToken)
     {
-        using var response = await http.GetAsync($"{PublicRoot}/latest/{NormalizeCoin(coin)}", cancellationToken);
-        var json = await ReadSuccessfulJsonAsync(response, cancellationToken);
-        var last = json.RootElement.GetProperty("prices").GetProperty("last");
-        return last.ValueKind == JsonValueKind.String
-            ? decimal.Parse(last.GetString()!, CultureInfo.InvariantCulture)
-            : last.GetDecimal();
+        var symbol = NormalizeCoin(coin);
+        using (var response = await http.GetAsync($"{PublicRoot}/latest/{symbol}", cancellationToken))
+        using (var json = await ReadSuccessfulJsonAsync(response, cancellationToken))
+        {
+            if (TryReadMarketLast(json.RootElement, symbol, out var price)) return price;
+        }
+
+        // Some CoinSpot-listed markets return an empty or keyed object from the
+        // per-coin route. The complete public ticker list includes those markets.
+        using var allResponse = await http.GetAsync($"{PublicRoot}/latest", cancellationToken);
+        using var allJson = await ReadSuccessfulJsonAsync(allResponse, cancellationToken);
+        if (TryReadMarketLast(allJson.RootElement, symbol, out var fallbackPrice))
+            return fallbackPrice;
+        throw new InvalidOperationException($"CoinSpot returned no current AUD price for {symbol}.");
+    }
+
+    private static bool TryReadMarketLast(JsonElement root, string coin, out decimal price)
+    {
+        price = 0;
+        if (!root.TryGetProperty("prices", out var prices) || prices.ValueKind != JsonValueKind.Object)
+            return false;
+        if (prices.TryGetProperty("last", out var directLast))
+        {
+            price = ReadDecimal(directLast);
+            return price > 0;
+        }
+
+        foreach (var market in prices.EnumerateObject())
+        {
+            if (!market.Name.Equals(coin, StringComparison.OrdinalIgnoreCase) ||
+                market.Value.ValueKind != JsonValueKind.Object ||
+                !market.Value.TryGetProperty("last", out var marketLast)) continue;
+            price = ReadDecimal(marketLast);
+            return price > 0;
+        }
+        return false;
     }
 
     public Task<JsonDocument> GetBuyQuoteAsync(string coin, decimal amount, string amountType, CancellationToken ct) =>
