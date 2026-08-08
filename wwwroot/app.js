@@ -5,6 +5,7 @@ let selectedGainerCoin = null;
 let gainersSort = { key: "threeDayAverage", direction: "desc" };
 let gainersRefreshedAt = null;
 let walletSnapshot = null;
+let selectedWalletCoin = null;
 let priceHover = null;
 let dailyPercentHover = null;
 let dailyPercentData = [];
@@ -818,6 +819,23 @@ $("gainersChart").addEventListener("click", async event => {
   selectedGainerCoin = selectedCoin.coin;
   drawGainers(gainersSnapshot);
   $("coin").value = selectedCoin.coin;
+  await analyse();
+  const timeline = $("timelineData");
+  timeline.scrollIntoView({ behavior: "smooth", block: "start" });
+  timeline.focus({ preventScroll: true });
+});
+$("walletChart").addEventListener("click", async event => {
+  if (!walletSnapshot?.length || $("analyse").disabled) return;
+  const canvas = $("walletChart");
+  const rect = canvas.getBoundingClientRect();
+  const y = (event.clientY - rect.top) * canvas.clientHeight / rect.height;
+  const rowIndex = Math.floor(y / 34);
+  const selectedHolding = walletSnapshot[rowIndex];
+  if (!selectedHolding || selectedHolding.coin === "AUD") return;
+  selectedWalletCoin = selectedHolding.coin;
+  drawWallet(walletSnapshot);
+  $("coin").value = selectedHolding.coin;
+  syncLiveTradeCoin();
   await analyse();
   const timeline = $("timelineData");
   timeline.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1792,7 +1810,10 @@ function drawWallet(items) {
     const y = 16 + index * rowHeight;
     const value = Number(item.audBalance);
     const isAvailableAud = item.coin === "AUD";
-    if (index % 2) {
+    if (item.coin === selectedWalletCoin) {
+      ctx.fillStyle = "rgba(216,136,24,.28)";
+      ctx.fillRect(0, y - 16, width, rowHeight);
+    } else if (index % 2) {
       ctx.fillStyle = "rgba(16,32,27,.025)";
       ctx.fillRect(0, y - 16, width, rowHeight);
     }
