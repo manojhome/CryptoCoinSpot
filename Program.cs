@@ -54,7 +54,20 @@ app.Use(async (context, next) =>
 });
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        if (context.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+            context.File.Name.EndsWith(".js", StringComparison.OrdinalIgnoreCase) ||
+            context.File.Name.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            context.Context.Response.Headers.Pragma = "no-cache";
+            context.Context.Response.Headers.Expires = "0";
+        }
+    }
+});
 
 app.MapGet("/access/login", (HttpContext context) =>
 {
@@ -246,6 +259,42 @@ app.MapGet("/api/intraday/{coin}", async (
             coin = CoinSpotClient.NormalizeCoin(coin),
             periodHours = 3,
             intervalMinutes = 5,
+            source = result.Source,
+            candles = result.Candles.Select(x => new
+            {
+                time = x.Time,
+                x.Open,
+                x.High,
+                x.Low,
+                x.Close,
+                x.Volume
+            }),
+            refreshedAt = DateTimeOffset.UtcNow
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.Message);
+    }
+});
+
+app.MapGet("/api/market/{coin}/24h", async (
+    string coin,
+    MarketDataClient market,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await market.GetTwentyFourHourCandlesAsync(coin, "aud", cancellationToken);
+        return Results.Ok(new
+        {
+            coin = CoinSpotClient.NormalizeCoin(coin),
+            periodHours = 24,
+            intervalMinutes = 15,
             source = result.Source,
             candles = result.Candles.Select(x => new
             {

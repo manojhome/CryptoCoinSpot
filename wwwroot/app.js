@@ -23,9 +23,13 @@ let liveTradingStatus = { configured: false, enabled: false, ready: false };
 const liveTradeQuotes = { buy: null, sell: null };
 let liveSellAmountType = "coin";
 let liveTransactionsSnapshot = [];
+let hideSoldTransactions = false;
 const liveRowSellQuotes = new Map();
 let intradayCandles = [];
 let intradayHover = null;
+let rowChartCandles = [];
+let rowChartHover = null;
+let rowChartRequestId = 0;
 let liveTapeSamples = [];
 let liveTapeCoin = null;
 let liveTapeTimer = null;
@@ -53,6 +57,17 @@ $("refreshHourlyTrend").addEventListener("click", () => refreshTrendMetric("hour
 $("refreshDailyTrend").addEventListener("click", () => refreshTrendMetric("daily"));
 $("liveTapeStart").addEventListener("click", startLiveTape);
 $("liveTapeStop").addEventListener("click", () => stopLiveTape());
+$("toggleSoldTransactions").addEventListener("click", () => {
+  hideSoldTransactions = !hideSoldTransactions;
+  const button = $("toggleSoldTransactions");
+  button.textContent = hideSoldTransactions ? "Show Sold" : "Hide Sold";
+  button.setAttribute("aria-pressed", String(hideSoldTransactions));
+  drawLiveTransactions();
+});
+$("rowChartClose").addEventListener("click", () => $("rowChartModal").close());
+$("rowChartModal").addEventListener("click", event => {
+  if (event.target === $("rowChartModal")) $("rowChartModal").close();
+});
 $("pullbackPeriod").addEventListener("change", async () => {
   pullbackHover = null;
   if (!snapshot) return;
@@ -400,8 +415,21 @@ function drawLiveTransactions() {
       }
     }
   }
-  [...liveTransactionsSnapshot].sort(
-    (left, right) => new Date(right.executedAt) - new Date(left.executedAt)).forEach(transaction => {
+  const displayedTransactions = [...liveTransactionsSnapshot].sort(
+    (left, right) => new Date(right.executedAt) - new Date(left.executedAt)).filter(transaction => {
+      if (!hideSoldTransactions) return true;
+      if (transaction.side === "sell") return false;
+      return saleNowByTransaction.get(transaction)?.status !== "Sold";
+    });
+  if (!displayedTransactions.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 10;
+    cell.textContent = "All sold transactions are hidden.";
+    row.appendChild(cell); body.appendChild(row);
+    return;
+  }
+  displayedTransactions.forEach(transaction => {
       const row = document.createElement("tr");
       appendTransactionCell(row, new Date(transaction.executedAt).toLocaleString("en-AU"));
       appendTransactionCell(row, transaction.coin);
@@ -443,12 +471,21 @@ function liveRowTransactionKey(transaction) {
 function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   const cell = document.createElement("td");
   cell.className = "transaction-row-actions";
+  const chartButton = document.createElement("button");
+  chartButton.type = "button";
+  chartButton.className = "row-chart-button";
+  chartButton.textContent = "24h chart";
+  chartButton.addEventListener("click", () => openLiveRowChart(transaction.coin));
   if (transaction.side !== "buy") {
-    cell.textContent = "—";
+    cell.appendChild(chartButton);
     return cell;
   }
   if (!saleNow?.sellableAmount) {
-    cell.textContent = saleNow?.status || "Unavailable";
+    cell.appendChild(chartButton);
+    const status = document.createElement("small");
+    status.className = "transaction-row-quote";
+    status.textContent = saleNow?.status || "Sell unavailable";
+    cell.appendChild(status);
     return cell;
   }
 
@@ -468,7 +505,7 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   quoteStatus.textContent = liveTradingStatus.configured
     ? "Refresh to obtain a 60-second quote"
     : "Full-access trading API unavailable";
-  buttons.append(refreshButton, sellButton);
+  buttons.append(chartButton, refreshButton, sellButton);
   cell.append(buttons, quoteStatus);
 
   const key = liveRowTransactionKey(transaction);
@@ -485,6 +522,54 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
     transaction, refreshButton, sellButton, quoteStatus));
   return cell;
 }
+
+async function openLiveRowChart(coin) {
+  const modal = $("rowChartModal");
+  const status = $("rowChartStatus");
+  const canvas = $("rowChartCanvas");
+  const requestId = ++rowChartRequestId;
+  rowChartCandles = [];
+  rowChartHover = null;
+  $("rowChartTitle").textContent = `${coin} · 24-hour price`;
+  canvas.setAttribute("aria-label", `${coin} 24-hour 15-minute candlestick chart`);
+  canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  status.className = "row-chart-status";
+  status.textContent = "Loading 15-minute candles…";
+  if (!modal.open) modal.showModal();
+  try {
+    const response = await fetch(`/api/market/${encodeURIComponent(coin)}/24h`, { cache: "no-store" });
+    const data = await readApiJson(response, "24-hour row chart");
+    if (!response.ok) throw new Error(data.error || data.detail || "24-hour candles failed.");
+    if (requestId !== rowChartRequestId || !modal.open) return;
+    rowChartCandles = data.candles || [];
+    if (!rowChartCandles.length) throw new Error("No 15-minute candles were returned.");
+    drawPriceCandles(canvas, rowChartCandles, rowChartHover);
+    status.textContent = `${rowChartCandles.length} candles · ${data.source} · updated ${new Date(data.refreshedAt).toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
+  } catch (error) {
+    if (requestId !== rowChartRequestId) return;
+    status.className = "row-chart-status failure";
+    status.textContent = `Chart unavailable: ${error.message}`;
+  }
+}
+
+$("rowChartCanvas").addEventListener("mousemove", event => {
+  if (!rowChartCandles.length) return;
+  const canvas = $("rowChartCanvas");
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * canvas.clientWidth / rect.width;
+  const y = (event.clientY - rect.top) * canvas.clientHeight / rect.height;
+  const left = 70, right = 16, top = 18, bottom = 38;
+  const step = (canvas.clientWidth - left - right) / rowChartCandles.length;
+  const index = Math.floor((x - left) / step);
+  rowChartHover = index < 0 || index >= rowChartCandles.length || y < top || y > canvas.clientHeight - bottom
+    ? null
+    : { index, x, y };
+  drawPriceCandles(canvas, rowChartCandles, rowChartHover);
+});
+$("rowChartCanvas").addEventListener("mouseleave", () => {
+  rowChartHover = null;
+  if (rowChartCandles.length) drawPriceCandles($("rowChartCanvas"), rowChartCandles);
+});
 
 function showLiveRowQuote(quote, saleNow, saleNowCell, quoteStatus) {
   const rate = Number(quote.rate);
@@ -846,6 +931,8 @@ window.addEventListener("resize", () => {
   if (gainersSnapshot) drawGainers(gainersSnapshot);
   if (walletSnapshot) drawWallet(walletSnapshot);
   if (intradayCandles.length) drawPriceCandles($("intradayChart"), intradayCandles, intradayHover);
+  if ($("rowChartModal").open && rowChartCandles.length)
+    drawPriceCandles($("rowChartCanvas"), rowChartCandles, rowChartHover);
 });
 
 async function analyse(isAutomatic = false) {

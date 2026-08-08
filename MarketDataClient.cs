@@ -91,6 +91,32 @@ public sealed class MarketDataClient(HttpClient http)
         CancellationToken cancellationToken) =>
         GetCoinSpotPriceAsync(CoinSpotClient.NormalizeCoin(coin), cancellationToken);
 
+    public async Task<(IReadOnlyList<Candle> Candles, string Source)> GetTwentyFourHourCandlesAsync(
+        string coin, string currency, CancellationToken cancellationToken)
+    {
+        var symbol = CoinSpotClient.NormalizeCoin(coin);
+        var now = DateTimeOffset.UtcNow;
+        var from = now.AddHours(-24);
+        try
+        {
+            var candles = await GetCoinSpotChartCandlesAsync(
+                symbol, 15, from.AddMinutes(-15), now, cancellationToken);
+            var selected = candles.Where(x => x.Time >= from).ToArray();
+            if (selected.Length >= 2)
+                return (selected, "CoinSpot 15-minute chart history");
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Fall through when CoinSpot has no chart history for this market.
+        }
+
+        var fallback = await GetKuCoinCandlesAsync(
+            symbol, "15min", from.AddMinutes(-15), currency, cancellationToken);
+        return (
+            fallback.Where(x => x.Time >= from).ToArray(),
+            "CoinSpot-listed KuCoin 15-minute market converted to AUD");
+    }
+
     public async Task<IReadOnlyList<Candle>> GetRecentDailyAsync(
         string coin, int days, string currency, CancellationToken cancellationToken)
     {

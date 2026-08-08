@@ -111,9 +111,22 @@ button span { margin-left: 18px; }
 .transaction-pnl.loss { color: var(--red); font-weight: 850; }
 .transaction-pnl small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; }
 .transaction-row-actions { min-width: 200px; }
-.transaction-row-buttons { display: flex; gap: 6px; }
+.transaction-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.transaction-title-row h2 { margin: 0; }
+.transaction-title-row .sold-transactions-toggle { height: 36px; padding: 0 15px; border: 2px solid var(--green-dark); border-radius: 9px; background: var(--lime); color: var(--ink); font-size: 12px; font-weight: 900; white-space: nowrap; box-shadow: 0 4px 12px rgba(8,115,74,.18); }
+.transaction-title-row button[aria-pressed="true"] { color: white; background: var(--green-dark); }
+.transaction-row-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .transaction-row-buttons button { height: 30px; padding: 0 9px; border-radius: 7px; font-size: 9px; white-space: nowrap; }
 .transaction-row-buttons .row-sell-button { color: white; background: var(--red); }
+.row-chart-button { height: 30px; padding: 0 10px; border: 1px solid var(--green-dark); border-radius: 7px; background: var(--card); color: var(--green-dark); font-size: 9px; white-space: nowrap; }
+.row-chart-modal { width: min(1100px, calc(100vw - 32px)); max-width: none; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); box-shadow: 0 28px 90px rgba(16,32,27,.3); }
+.row-chart-modal::backdrop { background: rgba(16,32,27,.62); backdrop-filter: blur(3px); }
+.row-chart-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.row-chart-modal-head h2 { margin: 0; font-size: 24px; }
+.row-chart-close { width: auto; height: 36px; padding: 0 14px; background: var(--paper); border: 1px solid var(--line); font-size: 12px; }
+.row-chart-status { margin: 10px 0 0; color: var(--muted); font: 650 10px/1.4 ui-monospace, Consolas, monospace; }
+.row-chart-status.failure { color: var(--red); }
+.row-chart-modal canvas { height: min(520px, 60vh); margin-top: 12px; }
 .transaction-row-quote { display: block; margin-top: 5px; color: var(--muted); font: 650 8px/1.35 ui-monospace, Consolas, monospace; }
 .transaction-row-quote.success { color: var(--green-dark); }
 .transaction-row-quote.failure { color: var(--red); }
