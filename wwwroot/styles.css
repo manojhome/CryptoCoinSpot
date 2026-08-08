@@ -139,6 +139,7 @@ button span { margin-left: 18px; }
 .row-chart-status.failure { color: var(--red); }
 .row-chart-modal canvas { height: min(520px, 60vh); margin-top: 12px; }
 .transaction-row-quote { display: block; margin-top: 5px; color: var(--muted); font: 650 8px/1.35 ui-monospace, Consolas, monospace; }
+.transaction-row-quote:empty, .auto-profit-status:empty { display: none; }
 .transaction-row-quote.success { color: var(--green-dark); }
 .transaction-row-quote.failure { color: var(--red); }
 

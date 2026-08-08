@@ -551,7 +551,7 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   const quoteStatus = document.createElement("small");
   quoteStatus.className = "transaction-row-quote";
   quoteStatus.textContent = liveTradingStatus.configured
-    ? "Refresh to obtain a 60-second quote"
+    ? ""
     : "Full-access trading API unavailable";
   buttons.append(chartButton, refreshButton, sellButton);
   const monitorStatus = document.createElement("small");
@@ -559,7 +559,7 @@ function createLiveRowSellCell(transaction, saleNow, saleNowCell) {
   const monitor = liveRowAutoProfitMonitors.get(key);
   monitorStatus.textContent = monitor
     ? `AUTO +${monitor.target}% armed · checked every 5 minutes while this page is open`
-    : "Choose one automatic net-profit target";
+    : "";
   cell.append(buttons, targetButtons, monitorStatus, quoteStatus);
 
   const existing = liveRowSellQuotes.get(key);
