@@ -32,6 +32,7 @@ let intradayCandles = [];
 let intradayHover = null;
 let rowChartCandles = [];
 let rowChartHover = null;
+let rowChartCoin = null;
 let rowChartRequestId = 0;
 let liveTapeSamples = [];
 let liveTapeCoin = null;
@@ -357,6 +358,9 @@ function redrawActualBuyMarkers() {
   if (pullbackCandles.length)
     drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover,
       withActualBuyMarkers(pullbackCandles, coin, pullbackMarkers));
+  if ($("rowChartModal").open && rowChartCandles.length)
+    drawPriceCandles($("rowChartCanvas"), rowChartCandles, rowChartHover,
+      withActualBuyMarkers(rowChartCandles, rowChartCoin));
 }
 
 function drawLiveTransactions() {
@@ -769,6 +773,7 @@ async function openLiveRowChart(coin) {
   const requestId = ++rowChartRequestId;
   rowChartCandles = [];
   rowChartHover = null;
+  rowChartCoin = coin;
   $("rowChartTitle").textContent = `${coin} · 24-hour price`;
   canvas.setAttribute("aria-label", `${coin} 24-hour 15-minute candlestick chart`);
   canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
@@ -782,7 +787,8 @@ async function openLiveRowChart(coin) {
     if (requestId !== rowChartRequestId || !modal.open) return;
     rowChartCandles = data.candles || [];
     if (!rowChartCandles.length) throw new Error("No 15-minute candles were returned.");
-    drawPriceCandles(canvas, rowChartCandles, rowChartHover);
+    drawPriceCandles(canvas, rowChartCandles, rowChartHover,
+      withActualBuyMarkers(rowChartCandles, rowChartCoin));
     status.textContent = `${rowChartCandles.length} candles · ${data.source} · updated ${new Date(data.refreshedAt).toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`;
   } catch (error) {
     if (requestId !== rowChartRequestId) return;
@@ -803,11 +809,13 @@ $("rowChartCanvas").addEventListener("mousemove", event => {
   rowChartHover = index < 0 || index >= rowChartCandles.length || y < top || y > canvas.clientHeight - bottom
     ? null
     : { index, x, y };
-  drawPriceCandles(canvas, rowChartCandles, rowChartHover);
+  drawPriceCandles(canvas, rowChartCandles, rowChartHover,
+    withActualBuyMarkers(rowChartCandles, rowChartCoin));
 });
 $("rowChartCanvas").addEventListener("mouseleave", () => {
   rowChartHover = null;
-  if (rowChartCandles.length) drawPriceCandles($("rowChartCanvas"), rowChartCandles);
+  if (rowChartCandles.length) drawPriceCandles($("rowChartCanvas"), rowChartCandles, null,
+    withActualBuyMarkers(rowChartCandles, rowChartCoin));
 });
 
 function showLiveRowQuote(quote, saleNow, saleNowCell, quoteStatus) {
@@ -1179,7 +1187,8 @@ window.addEventListener("resize", () => {
   if (intradayCandles.length) drawPriceCandles($("intradayChart"), intradayCandles, intradayHover,
     withActualBuyMarkers(intradayCandles, snapshot?.coin));
   if ($("rowChartModal").open && rowChartCandles.length)
-    drawPriceCandles($("rowChartCanvas"), rowChartCandles, rowChartHover);
+    drawPriceCandles($("rowChartCanvas"), rowChartCandles, rowChartHover,
+      withActualBuyMarkers(rowChartCandles, rowChartCoin));
 });
 
 async function analyse(isAutomatic = false) {
