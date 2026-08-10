@@ -676,9 +676,16 @@ async function checkAutoProfitMonitor(key, monitor) {
     const quote = await readApiJson(quoteResponse, "Automatic profit sell quote");
     if (!quoteResponse.ok) throw new Error(quote.error || quote.detail || "Automatic sell quote failed.");
     const allocatedCost = Number(monitor.saleNow.costAud) * Number(quote.amount) / Number(monitor.saleNow.sellableAmount);
-    const quotedNetProfit = Number(quote.amount) * Number(quote.rate) * .99 / allocatedCost * 100 - 100;
-    if (quotedNetProfit + .000001 < monitor.target) {
-      if (priceItem?.element) priceItem.element.title = `Latest executable quote net profit ${quotedNetProfit.toFixed(2)}%; target +${monitor.target}%.`;
+    const quotedNetProceeds = Number(quote.amount) * Number(quote.rate) * .99;
+    const quotedNetProfit = quotedNetProceeds / allocatedCost * 100 - 100;
+    // CoinSpot execution currently allows the order rate to move by up to 1%
+    // from the quote. Only submit when that worst permitted rate still leaves
+    // the selected net profit after the estimated 1% sell fee.
+    const worstExecutionNetProfit = quotedNetProceeds * .99 / allocatedCost * 100 - 100;
+    if (!Number.isFinite(worstExecutionNetProfit) || worstExecutionNetProfit < monitor.target) {
+      if (priceItem?.element) priceItem.element.title =
+        `Latest quote net profit ${quotedNetProfit.toFixed(2)}%; ` +
+        `worst permitted execution ${worstExecutionNetProfit.toFixed(2)}%; target +${monitor.target}%.`;
       return;
     }
 
