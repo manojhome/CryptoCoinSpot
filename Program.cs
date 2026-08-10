@@ -6,10 +6,21 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 builder.Services.AddMemoryCache();
-builder.Services.AddSingleton(new DailyPriceStore(
-    Path.Combine(builder.Environment.ContentRootPath, "Data")));
-builder.Services.AddSingleton(new TradeTransactionStore(
-    Path.Combine(builder.Environment.ContentRootPath, "Data")));
+var packagedDataDirectory = Path.Combine(builder.Environment.ContentRootPath, "Data");
+var dataDirectory = builder.Configuration["Storage:DataDirectory"];
+if (string.IsNullOrWhiteSpace(dataDirectory)) dataDirectory = packagedDataDirectory;
+Directory.CreateDirectory(dataDirectory);
+
+// Seed persistent hosting storage from a deployment package without ever
+// placing live transaction data in the public Git repository.
+var packagedTradesPath = Path.Combine(packagedDataDirectory, "live-trades.json");
+var persistentTradesPath = Path.Combine(dataDirectory, "live-trades.json");
+if (!string.Equals(packagedTradesPath, persistentTradesPath, StringComparison.OrdinalIgnoreCase) &&
+    File.Exists(packagedTradesPath) && !File.Exists(persistentTradesPath))
+    File.Copy(packagedTradesPath, persistentTradesPath);
+
+builder.Services.AddSingleton(new DailyPriceStore(dataDirectory));
+builder.Services.AddSingleton(new TradeTransactionStore(dataDirectory));
 builder.Services.AddHttpClient<MarketDataClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
