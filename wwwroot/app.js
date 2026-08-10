@@ -303,12 +303,60 @@ async function loadLiveTransactions() {
     liveTransactionsSnapshot = data.items || [];
     drawLiveTransactions();
     refreshLiveRowPrices();
+    redrawActualBuyMarkers();
     status.textContent = `${liveTransactionsSnapshot.length} transactions · Data/live-trades.json`;
   } catch (error) {
     liveTransactionsSnapshot = [];
     drawLiveTransactions();
     status.textContent = `Unavailable: ${error.message}`;
   }
+}
+
+function actualBuyMarkerIndexes(candles, coin) {
+  if (!candles?.length || !coin) return [];
+  const candleTimes = candles.map(candle => new Date(candle.time).getTime());
+  const gaps = candleTimes.slice(1).map((time, index) => time - candleTimes[index]);
+  const typicalGap = gaps.length
+    ? [...gaps].sort((left, right) => left - right)[Math.floor(gaps.length / 2)]
+    : 60 * 60 * 1000;
+  const indexes = new Set();
+  liveTransactionsSnapshot
+    .filter(transaction => transaction.side === "buy" && transaction.coin === coin)
+    .forEach(transaction => {
+      const boughtAt = new Date(transaction.executedAt).getTime();
+      if (!Number.isFinite(boughtAt) || boughtAt < candleTimes[0] - typicalGap ||
+          boughtAt > candleTimes[candleTimes.length - 1] + typicalGap) return;
+      let nearestIndex = 0;
+      let nearestDistance = Math.abs(candleTimes[0] - boughtAt);
+      candleTimes.forEach((time, index) => {
+        const distance = Math.abs(time - boughtAt);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+        }
+      });
+      indexes.add(nearestIndex);
+    });
+  return [...indexes];
+}
+
+function withActualBuyMarkers(candles, coin, markers = null) {
+  const actualBuys = actualBuyMarkerIndexes(candles, coin);
+  return actualBuys.length ? { ...(markers || {}), actualBuys } : markers;
+}
+
+function redrawActualBuyMarkers() {
+  const coin = snapshot?.coin;
+  if (!coin) return;
+  if (snapshot?.hourly?.length)
+    drawPriceCandles($("priceChart"), snapshot.hourly, priceHover,
+      withActualBuyMarkers(snapshot.hourly, coin));
+  if (intradayCandles.length)
+    drawPriceCandles($("intradayChart"), intradayCandles, intradayHover,
+      withActualBuyMarkers(intradayCandles, coin));
+  if (pullbackCandles.length)
+    drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover,
+      withActualBuyMarkers(pullbackCandles, coin, pullbackMarkers));
 }
 
 function drawLiveTransactions() {
@@ -898,7 +946,8 @@ async function loadIntradayCandles(coin) {
     if (!response.ok) throw new Error(data.error || data.detail || "Three-hour candles failed.");
     intradayCandles = data.candles || [];
     if (!intradayCandles.length) throw new Error("No recent candles were returned.");
-    drawPriceCandles($("intradayChart"), intradayCandles, intradayHover);
+    drawPriceCandles($("intradayChart"), intradayCandles, intradayHover,
+      withActualBuyMarkers(intradayCandles, coin));
     const provider = data.source.startsWith("CoinSpot") && !data.source.includes("KuCoin")
       ? "CoinSpot"
       : "KuCoin fallback";
@@ -1010,11 +1059,13 @@ $("priceChart").addEventListener("mousemove", event => {
   } else {
     priceHover = { index, y };
   }
-  drawPriceCandles(canvas, snapshot.hourly, priceHover);
+  drawPriceCandles(canvas, snapshot.hourly, priceHover,
+    withActualBuyMarkers(snapshot.hourly, snapshot.coin));
 });
 $("priceChart").addEventListener("mouseleave", () => {
   priceHover = null;
-  if (snapshot) drawPriceCandles($("priceChart"), snapshot.hourly);
+  if (snapshot) drawPriceCandles($("priceChart"), snapshot.hourly, null,
+    withActualBuyMarkers(snapshot.hourly, snapshot.coin));
 });
 $("intradayChart").addEventListener("mousemove", event => {
   if (!intradayCandles.length) return;
@@ -1028,11 +1079,13 @@ $("intradayChart").addEventListener("mousemove", event => {
   intradayHover = index < 0 || index >= intradayCandles.length || y < top || y > canvas.clientHeight - bottom
     ? null
     : { index, y };
-  drawPriceCandles(canvas, intradayCandles, intradayHover);
+  drawPriceCandles(canvas, intradayCandles, intradayHover,
+    withActualBuyMarkers(intradayCandles, snapshot?.coin));
 });
 $("intradayChart").addEventListener("mouseleave", () => {
   intradayHover = null;
-  if (intradayCandles.length) drawPriceCandles($("intradayChart"), intradayCandles);
+  if (intradayCandles.length) drawPriceCandles($("intradayChart"), intradayCandles, null,
+    withActualBuyMarkers(intradayCandles, snapshot?.coin));
 });
 $("dailyPercentChart").addEventListener("mousemove", event => {
   if (!dailyPercentData.length) return;
@@ -1064,11 +1117,13 @@ $("pullbackChart").addEventListener("mousemove", event => {
   pullbackHover = index < 0 || index >= pullbackCandles.length || y < top || y > canvas.clientHeight - bottom
     ? null
     : { index, y };
-  drawPriceCandles(canvas, pullbackCandles, pullbackHover, pullbackMarkers);
+  drawPriceCandles(canvas, pullbackCandles, pullbackHover,
+    withActualBuyMarkers(pullbackCandles, snapshot?.coin, pullbackMarkers));
 });
 $("pullbackChart").addEventListener("mouseleave", () => {
   pullbackHover = null;
-  if (pullbackCandles.length) drawPriceCandles($("pullbackChart"), pullbackCandles, null, pullbackMarkers);
+  if (pullbackCandles.length) drawPriceCandles($("pullbackChart"), pullbackCandles, null,
+    withActualBuyMarkers(pullbackCandles, snapshot?.coin, pullbackMarkers));
 });
 $("gainersChart").addEventListener("click", async event => {
   if (!gainersSnapshot?.length || $("analyse").disabled) return;
@@ -1121,7 +1176,8 @@ window.addEventListener("resize", () => {
   if (snapshot) drawCharts(snapshot);
   if (gainersSnapshot) drawGainers(gainersSnapshot);
   if (walletSnapshot) drawWallet(walletSnapshot);
-  if (intradayCandles.length) drawPriceCandles($("intradayChart"), intradayCandles, intradayHover);
+  if (intradayCandles.length) drawPriceCandles($("intradayChart"), intradayCandles, intradayHover,
+    withActualBuyMarkers(intradayCandles, snapshot?.coin));
   if ($("rowChartModal").open && rowChartCandles.length)
     drawPriceCandles($("rowChartCanvas"), rowChartCandles, rowChartHover);
 });
@@ -1147,6 +1203,7 @@ async function analyse(isAutomatic = false) {
     render(data);
     loadIntradayCandles(data.coin);
     if (liveTapeRunning && liveTapeCoin !== data.coin) startLiveTape();
+    else if (!liveTapeRunning) startLiveTape();
     nextRefresh = Date.now() + 60 * 60 * 1000;
     if (!timer) timer = setInterval(tick, 1000);
   } catch (error) {
@@ -1340,7 +1397,8 @@ async function refreshTrendMetric(section) {
       snapshot = { ...snapshot, hourly: data.hourly, trend: data.trend };
       renderHourlyTrendMetric(data.trend);
       const prices = data.hourly.map(item => Number(item.price));
-      drawPriceCandles($("priceChart"), data.hourly, priceHover);
+      drawPriceCandles($("priceChart"), data.hourly, priceHover,
+        withActualBuyMarkers(data.hourly, snapshot.coin));
       $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
       renderHourlySellTiming(data.hourly, currentMetricPrice ?? Number(data.currentPrice));
     } else {
@@ -1419,7 +1477,8 @@ function render(data) {
 
 function drawCharts(data) {
   const prices = data.hourly.map(x => Number(x.price));
-  drawPriceCandles($("priceChart"), data.hourly, priceHover);
+  drawPriceCandles($("priceChart"), data.hourly, priceHover,
+    withActualBuyMarkers(data.hourly, data.coin));
   $("priceRange").textContent = `${aud(Math.min(...prices), 4)} — ${aud(Math.max(...prices), 4)}`;
   renderHourlySellTiming(data.hourly, Number(data.currentPrice));
   drawDailyPercentageAnalysis(data.daily);
@@ -1589,7 +1648,8 @@ function drawPullbackAnalysis(allCandles) {
   const investmentAmount = Number(snapshot?.amount) || 1000;
   strategySimulations = renderStrategySimulation(pullbackCandles, investmentAmount);
   updateSelectedStrategyMarkers();
-  drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover, pullbackMarkers);
+  drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover,
+    withActualBuyMarkers(pullbackCandles, snapshot?.coin, pullbackMarkers));
 }
 
 async function loadAllTimeHistory() {
@@ -1615,7 +1675,8 @@ function selectStrategy(key) {
   selectedStrategy = key;
   updateSelectedStrategyMarkers();
   if (pullbackCandles.length)
-    drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover, pullbackMarkers);
+    drawPriceCandles($("pullbackChart"), pullbackCandles, pullbackHover,
+      withActualBuyMarkers(pullbackCandles, snapshot?.coin, pullbackMarkers));
 }
 
 function updateSelectedStrategyMarkers() {
@@ -2164,8 +2225,9 @@ function drawPriceCandles(canvas, candles, hover = null, markers = null) {
       });
       ctx.restore();
     };
-    drawMarkerLines(markers.buys, "rgba(8,115,74,.62)");
-    drawMarkerLines(markers.sells, "rgba(216,77,77,.62)");
+    drawMarkerLines(markers.buys || [], "rgba(8,115,74,.62)");
+    drawMarkerLines(markers.sells || [], "rgba(216,77,77,.62)");
+    drawMarkerLines(markers.actualBuys || [], "#d97706");
   }
 
   candles.forEach((candle, index) => {
