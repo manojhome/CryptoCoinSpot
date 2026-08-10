@@ -1,0 +1,44 @@
+name: Build and deploy to Azure
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_WEBAPP_NAME: cryptocoinspot-msugat-86e3fba9
+  DOTNET_VERSION: 8.0.x
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publish application
+        run: dotnet publish CryptoCoinSpot.csproj --configuration Release --output publish
+
+      - name: Sign in to Azure with OpenID Connect
+        uses: azure/login@v2
+        with:
+          client-id: ecdb13fd-58cb-4fcf-b0b9-186d7d6894f2
+          tenant-id: 9aa55cd8-b6b7-425b-a781-54f69f27273f
+          subscription-id: 86e3fba9-6582-4110-abf7-698c2b2ce04e
+
+      - name: Deploy application
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: publish
