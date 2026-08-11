@@ -1212,7 +1212,6 @@ async function analyse(isAutomatic = false) {
     render(data);
     loadIntradayCandles(data.coin);
     if (liveTapeRunning && liveTapeCoin !== data.coin) startLiveTape();
-    else if (!liveTapeRunning) startLiveTape();
     nextRefresh = Date.now() + 60 * 60 * 1000;
     if (!timer) timer = setInterval(tick, 1000);
   } catch (error) {
