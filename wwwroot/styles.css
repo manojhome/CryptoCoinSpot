@@ -20,10 +20,10 @@ body {
     var(--paper);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-.shell { width: min(1440px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 28px; }
-.hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; padding: 28px 0 34px; }
+.shell { width: min(1440px, calc(100% - 40px)); margin: 0 auto; padding: 20px 0 28px; }
+.hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; padding: 12px 0 18px; }
 .eyebrow, .label { margin: 0 0 10px; font: 700 11px/1.2 ui-monospace, Consolas, monospace; letter-spacing: .14em; color: var(--green-dark); }
-h1 { margin: 0; max-width: 900px; font-size: clamp(42px, 6vw, 82px); line-height: .96; letter-spacing: -.055em; }
+h1 { margin: 0; max-width: 900px; font-size: clamp(36px, 4.8vw, 62px); line-height: .98; letter-spacing: -.055em; }
 h1 span { color: var(--green); }
 .intro { max-width: 620px; color: var(--muted); font-size: 17px; line-height: 1.55; }
 .refresh-box { min-width: 185px; display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(16,32,27,.06); }
