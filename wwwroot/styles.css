@@ -21,6 +21,10 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 .shell { width: min(1440px, calc(100% - 40px)); margin: 0 auto; padding: 20px 0 28px; }
+.asset-tabs { display: inline-flex; gap: 5px; padding: 4px; margin-bottom: 8px; background: rgba(255,255,255,.78); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(16,32,27,.05); }
+.asset-tabs a { min-width: 92px; padding: 9px 18px; border-radius: 8px; color: var(--muted); text-align: center; text-decoration: none; font-size: 13px; font-weight: 850; }
+.asset-tabs a:hover { color: var(--green-dark); background: rgba(200,240,108,.2); }
+.asset-tabs a.active { color: var(--ink); background: var(--lime); box-shadow: 0 3px 9px rgba(16,32,27,.08); }
 .hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; padding: 12px 0 18px; }
 .eyebrow, .label { margin: 0 0 10px; font: 700 11px/1.2 ui-monospace, Consolas, monospace; letter-spacing: .14em; color: var(--green-dark); }
 h1 { margin: 0; max-width: 900px; font-size: clamp(36px, 4.8vw, 62px); line-height: .98; letter-spacing: -.055em; }
@@ -30,6 +34,30 @@ h1 span { color: var(--green); }
 .refresh-box strong, .refresh-box small { display: block; }
 .refresh-box small { margin-top: 3px; color: var(--muted); }
 .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 6px rgba(18,166,106,.14); }
+.live-dot.waiting { background: var(--amber); box-shadow: 0 0 0 6px rgba(216,136,24,.14); }
+.live-dot.offline { background: var(--red); box-shadow: 0 0 0 6px rgba(216,77,77,.14); }
+
+.stock-shell { width: min(1680px, calc(100% - 40px)); }
+.stock-panel, .ibkr-setup { padding: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 14px 36px rgba(16,32,27,.07); }
+.stock-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.stock-panel-head h2, .ibkr-setup h2 { margin: 0; font-size: 25px; }
+.stock-panel-head button { height: 42px; }
+.stock-table-wrap { margin-top: 16px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+.stock-table { width: 100%; min-width: 1450px; border-collapse: collapse; font-size: 12px; }
+.stock-table th { position: sticky; top: 0; z-index: 1; padding: 11px 12px; color: #dbe5df; background: var(--ink); text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+.stock-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.stock-table tbody tr:hover { background: rgba(200,240,108,.12); }
+.stock-table td small { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+.stock-table .numeric { text-align: right; font-family: ui-monospace, Consolas, monospace; white-space: nowrap; }
+.stock-table .positive { color: var(--green-dark); font-weight: 850; }
+.stock-table .negative { color: var(--red); font-weight: 850; }
+.range-cell { font-size: 10px; }
+.feed-pill { display: inline-block; padding: 4px 7px; border-radius: 999px; color: var(--green-dark); background: rgba(18,166,106,.1); font-size: 9px; font-weight: 800; white-space: nowrap; }
+.empty-stock-row { height: 180px; color: var(--muted); text-align: center; }
+.gateway-message { margin: 14px 0 0; padding: 13px 15px; color: #7b2020; background: #ffeded; border: 1px solid #f3c3c3; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+.ibkr-setup { margin-top: 14px; }
+.ibkr-setup p:last-child { max-width: 1050px; margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+.ibkr-setup code { padding: 2px 5px; color: var(--green-dark); background: var(--paper); border-radius: 4px; }
 
 .control-panel { display: grid; grid-template-columns: minmax(160px,.7fr) minmax(220px,1fr) auto; gap: 16px; align-items: end; padding: 22px; background: var(--ink); color: white; border-radius: 18px; box-shadow: 0 18px 45px rgba(16,32,27,.16); }
 label { display: grid; gap: 8px; color: #cdd7d2; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }

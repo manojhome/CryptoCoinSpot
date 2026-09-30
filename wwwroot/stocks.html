@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ASX stock market dashboard powered by Interactive Brokers">
+  <title>ASX Stocks · Investment Portfolio</title>
+  <link rel="stylesheet" href="/styles.css?v=20261001-stock-tabs-v1">
+</head>
+<body>
+  <main class="shell stock-shell">
+    <nav class="asset-tabs" aria-label="Portfolio markets">
+      <a href="/">Crypto</a>
+      <a class="active" href="/stocks.html" aria-current="page">Stock</a>
+    </nav>
+
+    <header class="hero stock-hero">
+      <div>
+        <p class="eyebrow">INTERACTIVE BROKERS / ASX</p>
+        <h1>Investment Portfolio<br><span>Stock</span></h1>
+      </div>
+      <div class="refresh-box">
+        <span id="ibkrDot" class="live-dot waiting"></span>
+        <div><strong id="ibkrState">Checking gateway</strong><small id="stockUpdated">Not loaded</small></div>
+      </div>
+    </header>
+
+    <section class="stock-panel" aria-labelledby="asxHeading">
+      <div class="stock-panel-head">
+        <div>
+          <p class="label">ASX / MARKET CAPITALISATION</p>
+          <h2 id="asxHeading">Top ASX stocks</h2>
+        </div>
+        <button id="refreshStocks" type="button">Refresh prices</button>
+      </div>
+      <p id="stockNote" class="data-note">IBKR provides up to 50 contracts per scanner request. Prices require an authenticated Client Portal Gateway and the applicable Australian market-data permission.</p>
+      <div id="stockError" class="gateway-message" role="alert" hidden></div>
+      <div class="stock-table-wrap">
+        <table class="stock-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Symbol</th><th>Company</th><th>Industry</th><th>Last</th><th>Change</th>
+              <th>Bid</th><th>Ask</th><th>Volume</th><th>Day range</th><th>52-week range</th><th>Feed</th>
+            </tr>
+          </thead>
+          <tbody id="stockRows">
+            <tr><td colspan="12" class="empty-stock-row">Connecting to Interactive Brokers…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="ibkr-setup" aria-labelledby="gatewayHeading">
+      <p class="label">SECURE CONNECTION</p>
+      <h2 id="gatewayHeading">IBKR gateway setup</h2>
+      <p>This app does not store your Interactive Brokers username or password. Run Client Portal Gateway on a private host, sign in through its browser page, complete MFA, and configure <code>IBKR_GATEWAY_BASE_URL</code> to a URL this server can reach. Azure cannot call a gateway running only on your home computer unless you provide a secure private connection.</p>
+    </section>
+  </main>
+  <script src="/stocks.js?v=20261001-stock-tabs-v1"></script>
+</body>
+</html>

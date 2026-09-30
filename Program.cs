@@ -31,6 +31,22 @@ builder.Services.AddHttpClient(nameof(CoinSpotClient), client =>
     client.Timeout = TimeSpan.FromSeconds(30);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("CryptoCoinSpot/2.0");
 });
+var ibkrGatewayBaseUrl = Environment.GetEnvironmentVariable("IBKR_GATEWAY_BASE_URL")
+    ?? builder.Configuration["IBKR:GatewayBaseUrl"]
+    ?? "https://localhost:5000/v1/api/";
+builder.Services.AddHttpClient<IbkrMarketDataClient>(client =>
+{
+    client.BaseAddress = new Uri(ibkrGatewayBaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(45);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("CryptoCoinSpot/2.0");
+}).ConfigurePrimaryHttpMessageHandler(() =>
+{
+    var handler = new HttpClientHandler();
+    var gatewayUri = new Uri(ibkrGatewayBaseUrl);
+    if (gatewayUri.IsLoopback)
+        handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+    return handler;
+});
 
 var app = builder.Build();
 const string sitePassword = "TEST1234789!";
@@ -610,6 +626,44 @@ app.MapGet("/api/coinspot/trading/transactions", async (
     catch (Exception ex)
     {
         return Results.Problem(ex.Message);
+    }
+});
+
+app.MapGet("/api/ibkr/status", async (
+    HttpContext context,
+    IbkrMarketDataClient ibkr,
+    CancellationToken cancellationToken) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    try
+    {
+        return Results.Ok(await ibkr.GetStatusAsync(cancellationToken));
+    }
+    catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Json(new
+        {
+            authenticated = false,
+            connected = false,
+            message = $"IBKR Client Portal Gateway is unavailable: {ex.Message}"
+        }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
+app.MapGet("/api/ibkr/asx/top", async (
+    HttpContext context,
+    int? limit,
+    IbkrMarketDataClient ibkr,
+    CancellationToken cancellationToken) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    try
+    {
+        return Results.Ok(await ibkr.GetAsxLeadersAsync(limit ?? 200, cancellationToken));
+    }
+    catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+    {
+        return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
 

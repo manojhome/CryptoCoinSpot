@@ -65,6 +65,8 @@ Open the local URL shown by ASP.NET. Enter a coin ticker (TRX by default) and
 an AUD paper-investment amount. The responsive dashboard refreshes hourly and
 shows price and investment-value charts, trend metrics, the five entry gates,
 daily candles, stop level, profit targets, and two live CoinSpot trade panels.
+The Crypto and Stock tabs switch between the existing crypto dashboard and a
+separate ASX stock page.
 Immediately above TimelineData, three refreshable cards show Current Price,
 Hourly Trend, and Daily Trend. Current Price automatically requests a CoinSpot
 sell quote and can be re-quoted on demand; it turns green when the quote rises
@@ -136,6 +138,32 @@ day, this is a limited in-sample pattern, not a profit guarantee or forecast.
 Public data providers can rate-limit or change their APIs. Do not automate live
 orders without persistence, idempotency, reconciliation against CoinSpot order
 history, maximum position limits, and alerting.
+
+## Interactive Brokers ASX page
+
+The Stock tab reads ASX market leaders and price details through Interactive
+Brokers' Client Portal Gateway. Brokerage credentials are deliberately never
+stored in this app. Start the gateway on a private machine, open its login page,
+sign in directly with IBKR, and complete MFA. The default local gateway URL is
+`https://localhost:5000/v1/api/`.
+
+For a gateway reachable through a private network, set its base URL before
+starting the app:
+
+```powershell
+$env:IBKR_GATEWAY_BASE_URL = "https://your-private-gateway/v1/api/"
+```
+
+The equivalent ASP.NET setting is `IBKR:GatewayBaseUrl`. `IBKR:AsxLocation`
+defaults to `STK.AU`, and `IBKR:ScannerType` defaults to `HIGH_MKT_CAP`. The
+gateway session must be reauthenticated according to IBKR's session rules, and
+Australian live prices require the applicable market-data subscription.
+
+IBKR limits one market-scanner response to 50 contracts. The page accepts a
+requested cap of 200 but truthfully displays the contracts returned by IBKR and
+shows the provider limit. Azure App Service cannot reach a gateway running only
+on a home computer; expose it only through an authenticated private network or
+VPN, never by publishing the gateway directly to the internet.
 
 ## Stored daily prices
 
