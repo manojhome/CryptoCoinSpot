@@ -83,17 +83,31 @@
       const result = await get('/api/moomoo/status');
       csrfToken = result.csrfToken;
       liveEnabled = result.liveEnabled;
+      find('#moomooState').textContent = result.connection.connected ? 'Moomoo connected' : 'Moomoo authorization required';
+      find('#moomooDot').className = result.connection.connected ? 'live-dot' : 'live-dot offline';
+      find('#moomooUpdated').textContent = result.connection.connected ? 'Saved authorization restored' : 'Connect your account';
       find('#moomooConnection').textContent = result.connection.message;
       find('#enableMoomooTrading').disabled = !result.connection.canTrade;
       find('#enableMoomooTrading').textContent = liveEnabled ? 'Disable live trading' : 'Enable live trading';
       find('#moomooTradingStatus').textContent = liveEnabled ? 'Live trading enabled. Each order requires review and confirmation.' :
         result.connection.canTrade ? 'Live trading is disabled. Select your US account and enable trading to prepare an order.' : 'Live trading locked: authorization, trade permission and production account verification are required.';
       if (result.connection.connected) {
+        sessionStorage.removeItem('moomoo-auto-connect');
         await loadStocks();
         await loadAccounts();
+      } else if (result.connection.requiresAuthorization &&
+          !new URLSearchParams(location.search).has('moomoo') &&
+          !sessionStorage.getItem('moomoo-auto-connect')) {
+        sessionStorage.setItem('moomoo-auto-connect', 'started');
+        await connectMoomoo();
       }
       setOrderControls();
-    } catch (error) { find('#moomooConnection').textContent = error.message; }
+    } catch (error) {
+      find('#moomooConnection').textContent = error.message;
+      find('#moomooState').textContent = 'Moomoo connection unavailable';
+      find('#moomooDot').className = 'live-dot offline';
+      find('#moomooUpdated').textContent = 'Reconnect Moomoo below';
+    }
   }
   async function loadStocks() {
     find('#refreshUsStocks').disabled = true;
@@ -137,7 +151,7 @@
     form.scrollIntoView({behavior:'smooth', block:'center'});
     if (liveEnabled) form.elements.quantity.focus();
   });
-  find('#connectMoomoo').addEventListener('click', async () => {
+  async function connectMoomoo() {
     find('#connectMoomoo').disabled = true;
     try {
       const result = await post('/api/moomoo/connect', {});
@@ -145,7 +159,8 @@
       if (url.origin !== 'https://webapi.moomoo.com' || url.pathname !== '/oauth2/authorize/confirm') throw new Error('Unexpected authorization destination.');
       window.location.assign(url.href);
     } catch (error) { find('#moomooConnection').textContent = error.message; find('#connectMoomoo').disabled = false; }
-  });
+  }
+  find('#connectMoomoo').addEventListener('click', connectMoomoo);
   find('#enableMoomooTrading').addEventListener('click', async () => {
     try {
       const result = await post('/api/moomoo/trading/enable', { enabled: !liveEnabled });

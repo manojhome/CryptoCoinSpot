@@ -28,12 +28,15 @@ Directory.CreateDirectory(directory);
 var handler = new FakeMoomoo();
 var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Storage:DataDirectory"] = directory }).Build();
 var cache = new MemoryCache(new MemoryCacheOptions());
-var client = new MoomooClient(new Factory(handler), new EphemeralDataProtectionProvider(), cache, config);
+var protection = new EphemeralDataProtectionProvider();
+var client = new MoomooClient(new Factory(handler), protection, cache, config);
 Assert(MoomooClient.NormalizeSymbol(" aapl ") == "US.AAPL", "US ticker normalization");
 await Reject(() => { MoomooClient.NormalizeSymbol("HK.00700"); return Task.CompletedTask; }, "foreign market prefix rejected before credentials");
 await Reject(() => client.GetStocksAsync("HK.00700", default), "non-US symbol rejected");
 await Reject(() => client.GetStocksAsync("AAPL", default), "missing credentials rejected");
 Assert(handler.RequestCount == 0, "missing credentials never call provider");
+var disconnected = JsonSerializer.SerializeToElement(await client.AuthenticateAsync(default));
+Assert(!disconnected.GetProperty("connected").GetBoolean() && disconnected.GetProperty("requiresAuthorization").GetBoolean(), "missing authorization requests browser connection");
 var url = new Uri(await client.BeginAuthorizationAsync("browser-one", default));
 var state = QueryHelpers.ParseQuery(url.Query)["state"].ToString();
 Assert(QueryHelpers.ParseQuery(url.Query)["code_challenge_method"] == "S256", "PKCE challenge used");
@@ -42,6 +45,15 @@ await client.CompleteAuthorizationAsync(state, "test-code", "browser-one", defau
 await Reject(() => client.CompleteAuthorizationAsync(state, "test-code", "browser-one", default), "OAuth callback single use");
 var disk = File.ReadAllText(Path.Combine(directory, "moomoo-tokens.json"));
 Assert(!disk.Contains("fake-access") && !disk.Contains("fake-refresh"), "credentials encrypted on disk");
+var restored = JsonSerializer.SerializeToElement(await client.AuthenticateAsync(default));
+Assert(restored.GetProperty("connected").GetBoolean(), "saved authorization restored when stock tab opens");
+var expiredTokens = client.ReadTokens()! with { ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1) };
+File.WriteAllText(Path.Combine(directory, "moomoo-tokens.json"),
+    protection.CreateProtector("CryptoCoinSpot.Moomoo.Tokens.v1").Protect(JsonSerializer.Serialize(expiredTokens)));
+var beforeRefresh = handler.RequestCount;
+await client.AuthenticateAsync(default);
+Assert(handler.RequestCount == beforeRefresh + 1 && client.ReadTokens()!.ExpiresAt > DateTimeOffset.UtcNow.AddMinutes(1),
+    "opening stock tab refreshes and persists expired authorization automatically");
 var stocks = JsonSerializer.SerializeToElement(await client.GetStocksAsync("AAPL,MSFT", default));
 Assert(stocks.GetProperty("items")[0].GetProperty("changePercent").GetDecimal() == 10, "day gain uses previous close");
 Assert(stocks.GetProperty("missingSymbols")[0].GetString() == "US.MSFT", "partial quotes report missing symbols");

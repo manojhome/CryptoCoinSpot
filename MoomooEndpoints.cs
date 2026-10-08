@@ -12,11 +12,14 @@ public static class MoomooEndpoints
         var reviews = new ConcurrentDictionary<string, MoomooReview>();
         var enabled = false;
 
-        app.MapGet("/api/moomoo/status", (HttpContext context, MoomooClient client, IAntiforgery antiforgery) =>
+        app.MapGet("/api/moomoo/status", async (HttpContext context, MoomooClient client, IAntiforgery antiforgery) =>
         {
             context.Response.Headers.CacheControl = "no-store";
-            try { return Results.Ok(new { connection = client.Status(), liveEnabled = enabled,
+            try { return Results.Ok(new { connection = await client.AuthenticateAsync(context.RequestAborted), liveEnabled = enabled,
                 csrfToken = antiforgery.GetAndStoreTokens(context).RequestToken }); }
+            catch (MoomooAuthorizationException ex) { return Results.Ok(new {
+                connection = new { connected = false, canTrade = false, requiresAuthorization = true, message = ex.Message },
+                liveEnabled = false, csrfToken = antiforgery.GetAndStoreTokens(context).RequestToken }); }
             catch { return Failure("Stored Moomoo credentials cannot be opened. Reconnect Moomoo."); }
         });
 

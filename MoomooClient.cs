@@ -12,6 +12,11 @@ using Microsoft.Extensions.Configuration;
 
 namespace CryptoTrader;
 
+public sealed class MoomooAuthorizationException : InvalidOperationException
+{
+    public MoomooAuthorizationException() : base("Moomoo authorization expired or was revoked. Connect again.") { }
+}
+
 public sealed record MoomooTokens(string ClientId, string AccessToken, string RefreshToken, string Scope, DateTimeOffset ExpiresAt);
 public sealed record MoomooAuthorization(string ClientId, string Verifier, string BrowserBinding);
 public sealed record MoomooOrder(string AccountId, string Symbol, string Side, int Quantity, decimal LimitPrice);
@@ -73,6 +78,15 @@ public sealed class MoomooClient
                 : "Connected; production account is unverified. Live orders are locked." };
     }
 
+    public async Task<object> AuthenticateAsync(CancellationToken ct)
+    {
+        if (ReadTokens() == null)
+            return new { connected = false, canTrade = false, requiresAuthorization = true,
+                message = "Authorize Moomoo to connect this site." };
+        await GetTokensAsync(ct);
+        return Status();
+    }
+
     public async Task<string> BeginAuthorizationAsync(string browserBinding, CancellationToken ct)
     {
         var redirect = new Uri(RedirectUri);
@@ -132,6 +146,8 @@ public sealed class MoomooClient
     private async Task<JsonElement> TokenRequestAsync(Dictionary<string, string> values, CancellationToken ct)
     {
         using var response = await http.PostAsync("/oauth2/token", new FormUrlEncodedContent(values), ct);
+        if (response.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Unauthorized)
+            throw new MoomooAuthorizationException();
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Moomoo token exchange failed. Connect again.");
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         if (!document.RootElement.TryGetProperty("access_token", out _))

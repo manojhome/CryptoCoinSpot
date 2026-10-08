@@ -58,9 +58,9 @@ async function loadStocks() {
     updated.textContent = `Updated ${new Date(result.retrievedAt).toLocaleString("en-AU")}`;
     if (result.note) note.textContent = result.note;
   } catch (error) {
-    state.textContent = "Gateway unavailable";
+    state.textContent = "IBKR unavailable";
     dot.className = "live-dot offline";
-    updated.textContent = "Authentication required";
+    updated.textContent = "See connection details below";
     rows.innerHTML = '<tr><td colspan="12" class="empty-stock-row">IBKR data is not available.</td></tr>';
     errorBox.textContent = error.message;
     errorBox.hidden = false;
@@ -70,7 +70,6 @@ async function loadStocks() {
 }
 
 refresh.addEventListener("click", loadStocks);
-loadStocks();
 
 const risersRefresh = document.querySelector("#refreshAsxRisers");
 const risersRows = document.querySelector("#asxRisersRows");
