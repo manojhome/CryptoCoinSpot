@@ -139,7 +139,49 @@ Public data providers can rate-limit or change their APIs. Do not automate live
 orders without persistence, idempotency, reconciliation against CoinSpot order
 history, maximum position limits, and alerting.
 
-## Interactive Brokers ASX page
+## Moomoo US stock details and order panes
+
+The Stock page includes a USD stock snapshot panel for up to 20 US tickers and
+Buy/Sell order panes. **Connect Moomoo** uses the official OAuth 2.1 PKCE flow;
+sign-in alone does not supply API credentials. Approve the required permissions
+on Moomoo's authorization page yourself. Tokens are encrypted with ASP.NET Data
+Protection in `Data/moomoo-tokens.json`, excluded from Git and never sent to the
+browser. Data Protection keys are stored under `Data/moomoo-keys/`, excluded
+from Git, and encrypted with Windows DPAPI for the current Windows user.
+Retain that directory and Windows identity to retain access after restart.
+On other hosts, configure an appropriate Data Protection key encryptor before
+connecting a brokerage account.
+
+The default callback is `http://localhost:55109/access/moomoo/callback`.
+Set `Moomoo:RedirectUri` to the server's actual callback URL when running on
+another port or host; remote callbacks require HTTPS.
+
+The inspected browser account was labelled sandbox. Orders therefore remain
+locked until a real production account is independently verified and configured
+using `Moomoo:ProductionAccountVerified=true` and `Moomoo:ProductionAccountId`.
+OAuth must also grant `trade:write` and access to that account. These settings
+are not evidence of verification on their own; verify the account in Moomoo first.
+Trading must be enabled again after each app restart. Orders are whole-share
+LIMIT/DAY/RTH orders capped at US$10,000 before fees. Each review expires after
+60 seconds and is consumed once before sending. No automatic retry occurs.
+If an order times out or needs additional broker confirmation, reconcile its
+status directly in Moomoo before placing another order. No live order was placed
+during development. Production quotes and execution need an authorized account
+to be verified end to end.
+
+Run the isolated authorization and trading-gate checks with
+`dotnet run --project tests/MoomooChecks/MoomooChecks.csproj`.
+
+## ASX providers
+
+The Stock page also has an **ASX 200 / Top 10 risers today** panel. Moomoo's
+REST stock-quote and market-snapshot documentation currently excludes AU,
+although its plate membership API lists AU. Until an Australian quote provider
+and verified ASX 200 membership are connected, this panel reports unavailable
+rather than displaying sandbox quotes or rankings from IBKR's 50-stock scanner.
+The logged-in Moomoo developer dashboard inspected during setup had no existing
+AppKeys and labelled the account as a sandbox. No credentials were created or
+stored. See https://open.moomoo.com/api/quote/realtime/stock-quote.
 
 The Stock tab reads ASX market leaders and price details through Interactive
 Brokers' Client Portal Gateway. Brokerage credentials are deliberately never
@@ -197,3 +239,26 @@ available. Each new entry stores an estimated fee using CoinSpot's current 1%
 Instant Buy/Sell rate; older entries calculate the same estimate when displayed.
 P/L is based on CoinSpot's returned totals, so the displayed fee is not deducted
 again. The ledger is local runtime data and is excluded from Git.
+### US Top 50 gainers
+
+The stock page includes a sortable Top 50 gainers panel with stock, 3D average,
+previous day, day before, trading-day change, 1H change and USD price. Moomoo's
+US screening query sorts on one-day cumulative percentage change (3102), then
+static profiles filter the first 300 results to active stocks; up to 50 are shown.
+OTC stocks are included. Snapshot price/previous close supplies the displayed
+day change. Daily candles supply the two previous completed sessions; completed
+regular-session five-minute candles supply the one-hour change, requiring exact
+60-minute separation within the same session. Missing history stays N/A.
+Results are cached for two minutes with three concurrent history requests at most.
+Clicking a stock loads its detail panel and submits no order.
+
+### Moomoo holdings
+
+The stock page starts with My holdings across all authorized accounts and markets,
+with an optional account filter and each position's reported currency. It retrieves
+positions through the server and shows shares, available shares, broker cost basis,
+current price/value and broker-reported dollar/percentage P/L. Invalid cost or P/L
+fields remain unavailable. The positions API does not provide purchase dates;
+reported diluted cost may include prior sales, so this is not a date-specific
+purchase return. Buy/Sell selects the holding and account in the existing reviewed
+order form. It does not submit an order or bypass the production/trading gates.

@@ -50,4 +50,5 @@ secrets.json
 appsettings.Local.json
 *.csv
 Data/*.json
+Data/moomoo-keys/
 !Data/.gitkeep

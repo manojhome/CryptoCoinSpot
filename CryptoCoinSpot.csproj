@@ -6,4 +6,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <UserSecretsId>1e2fe89c-afa7-4582-baef-e7b8a8b214d1</UserSecretsId>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+    <Content Remove="tests/**;artifacts/**;Data/moomoo-keys/**;Data/moomoo*.json;Data/moomoo*.tmp" />
+    <None Remove="tests/**;artifacts/**;Data/moomoo-keys/**;Data/moomoo*.json;Data/moomoo*.tmp" />
+  </ItemGroup>
 </Project>

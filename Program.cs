@@ -2,14 +2,29 @@ using CryptoTrader;
 using Microsoft.Extensions.Caching.Memory;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 builder.Services.AddMemoryCache();
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-Token");
+if (OperatingSystem.IsWindows())
+    builder.Logging.AddFilter<Microsoft.Extensions.Logging.EventLog.EventLogLoggerProvider>(null, LogLevel.None);
+builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
+builder.Services.AddHttpClient("Moomoo", client =>
+{
+    client.BaseAddress = new Uri("https://webapi.moomoo.com");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddSingleton<MoomooClient>();
 var packagedDataDirectory = Path.Combine(builder.Environment.ContentRootPath, "Data");
 var dataDirectory = builder.Configuration["Storage:DataDirectory"];
 if (string.IsNullOrWhiteSpace(dataDirectory)) dataDirectory = packagedDataDirectory;
 Directory.CreateDirectory(dataDirectory);
+var protection = builder.Services.AddDataProtection()
+    .SetApplicationName("CryptoCoinSpot")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDirectory, "moomoo-keys")));
+if (OperatingSystem.IsWindows()) protection.ProtectKeysWithDpapi();
 
 // Seed persistent hosting storage from a deployment package without ever
 // placing live transaction data in the public Git repository.
@@ -629,6 +644,23 @@ app.MapGet("/api/coinspot/trading/transactions", async (
     }
 });
 
+// AU membership is documented, but Moomoo's REST quote endpoints currently
+// exclude AU. Report the limitation instead of publishing simulated rankings.
+app.MapGet("/api/stocks/asx200/risers", (HttpContext context) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    return Results.Ok(new
+    {
+        available = false,
+        source = "Moomoo",
+        market = "AU",
+        universe = "S&P/ASX 200",
+        items = Array.Empty<object>(),
+        message = "Moomoo's documented real-time stock quote and market snapshot APIs do not support Australian symbols. An ASX quote provider and verified ASX 200 membership are required to display today's top 10 risers.",
+        documentationUrl = "https://open.moomoo.com/api/quote/realtime/stock-quote"
+    });
+});
+
 app.MapGet("/api/ibkr/status", async (
     HttpContext context,
     IbkrMarketDataClient ibkr,
@@ -666,6 +698,8 @@ app.MapGet("/api/ibkr/asx/top", async (
         return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
+
+app.MapMoomoo();
 
 // Data files are server-side storage only. They must never be served directly,
 // even to an authenticated browser; callers use the protected API routes.

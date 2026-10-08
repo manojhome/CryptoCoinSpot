@@ -44,6 +44,18 @@ h1 span { color: var(--green); }
 .stock-panel-head button { height: 42px; }
 .stock-table-wrap { margin-top: 16px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
 .stock-table { width: 100%; min-width: 1450px; border-collapse: collapse; font-size: 12px; }
+.asx-risers-table { min-width: 760px; }
+.stock-panel + .stock-panel, .live-trade-panel + .stock-panel { margin-top: 14px; }
+.moomoo-quote-form { display: flex; align-items: end; gap: 14px; }
+.moomoo-quote-form label { flex: 1; color: var(--muted); }
+.moomoo-quote-form input { color: var(--ink); background: var(--paper); border-color: var(--line); font-size: 14px; }
+.moomoo-account-label { max-width: 460px; color: var(--muted); }
+.moomoo-account-label select { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); }
+.moomoo-order-form fieldset { display: grid; gap: 14px; border: 0; padding: 0; margin: 0; }
+.moomoo-order-form fieldset:disabled { opacity: .6; }
+.moomoo-review { margin-top: 16px; padding: 18px; border: 2px solid var(--amber); border-radius: 12px; }
+.moomoo-review[hidden] { display: none; }
+@media (max-width: 700px) { .moomoo-quote-form { flex-direction: column; align-items: stretch; } .moomoo-quote-form label { width: 100%; } }
 .stock-table th { position: sticky; top: 0; z-index: 1; padding: 11px 12px; color: #dbe5df; background: var(--ink); text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
 .stock-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
 .stock-table tbody tr:hover { background: rgba(200,240,108,.12); }
@@ -336,3 +348,14 @@ footer { padding: 24px 4px 0; color: var(--muted); font-size: 12px; text-align: 
   .pullback-controls { justify-items: start; }
   .pullback-period-row { justify-content: flex-start; }
 }
+.holdings-actions { white-space: nowrap; }
+.holdings-actions button { padding: 7px 12px; margin: 3px; }
+.holdings-actions button[data-side="BUY"] { color: #159b76; }
+.holdings-actions button[data-side="SELL"] { color: #d95d65; }
+.us-gainers-scroll { max-height: 620px; overflow: auto; }
+.us-gainers-table { min-width: 1000px; }
+.us-gainers-table thead { position: sticky; top: 0; z-index: 1; }
+.us-gainers-table th button { height: auto; background: transparent; color: inherit; border: 0; padding: 0; font: inherit; text-transform: inherit; }
+.us-gainers-table .gainer-symbol { height: auto; background: transparent; border: 0; padding: 0; color: var(--ink); font-size: 12px; font-weight: 700; }
+.us-gainers-table td { padding: 7px 12px; }
+.gainer-bar { display: block; height: 4px; background: #12a66a; margin-top: 5px; border-radius: 2px; }

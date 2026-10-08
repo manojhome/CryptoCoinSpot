@@ -71,3 +71,49 @@ async function loadStocks() {
 
 refresh.addEventListener("click", loadStocks);
 loadStocks();
+
+const risersRefresh = document.querySelector("#refreshAsxRisers");
+const risersRows = document.querySelector("#asxRisersRows");
+const risersStatus = document.querySelector("#asxRisersStatus");
+const risersError = document.querySelector("#asxRisersError");
+const sydneyTime = new Intl.DateTimeFormat("en-AU", {
+  timeZone: "Australia/Sydney", dateStyle: "medium", timeStyle: "short"
+});
+
+async function loadAsxRisers() {
+  if (risersRefresh.disabled) return;
+  risersRefresh.disabled = true;
+  risersError.hidden = true;
+  risersStatus.textContent = "Checking ASX 200 daily risers…";
+  try {
+    const result = await readJson(await fetch("/api/stocks/asx200/risers", { cache: "no-store" }));
+    if (!result.available) {
+      risersStatus.textContent = "Moomoo · Australian quotes unavailable";
+      risersRows.innerHTML = '<tr><td colspan="7" class="empty-stock-row">Current ASX 200 rankings are unavailable.</td></tr>';
+      risersError.textContent = result.message;
+      risersError.hidden = false;
+      return;
+    }
+    // The server must supply a verified ASX 200 universe and current-session quotes.
+    const items = (result.items || []).filter(item => Number.isFinite(item.changePercent) && item.changePercent > 0)
+      .sort((a, b) => b.changePercent - a.changePercent).slice(0, 10);
+    risersRows.innerHTML = items.length ? items.map((item, index) => `<tr>
+      <td>${index + 1}</td><td><strong>${escapeHtml(item.symbol)}</strong></td>
+      <td>${escapeHtml(item.company)}</td><td class="numeric">${price(item.last)}</td>
+      <td class="numeric positive">+${number.format(item.changePercent)}%</td>
+      <td class="numeric">${item.volume == null ? "—" : number.format(item.volume)}</td>
+      <td>${item.quoteTime ? escapeHtml(sydneyTime.format(new Date(item.quoteTime))) : "—"}<small>${escapeHtml(item.feed || "Feed unverified")}</small></td>
+    </tr>`).join("") : '<tr><td colspan="7" class="empty-stock-row">No positive daily gainers were returned.</td></tr>';
+    risersStatus.textContent = `${result.source} · ${items.length} risers · Retrieved ${sydneyTime.format(new Date(result.retrievedAt))}`;
+  } catch (error) {
+    risersStatus.textContent = "ASX 200 data unavailable";
+    risersRows.innerHTML = '<tr><td colspan="7" class="empty-stock-row">Unable to load current rankings.</td></tr>';
+    risersError.textContent = error.message;
+    risersError.hidden = false;
+  } finally {
+    risersRefresh.disabled = false;
+  }
+}
+
+risersRefresh.addEventListener("click", loadAsxRisers);
+loadAsxRisers();

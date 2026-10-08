@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="ASX stock market dashboard powered by Interactive Brokers">
-  <title>ASX Stocks · Investment Portfolio</title>
-  <link rel="stylesheet" href="/styles.css?v=20261001-stock-tabs-v1">
+  <meta name="description" content="Australian stock market dashboard and ASX 200 daily risers">
+  <title>Stocks · Investment Portfolio</title>
+  <link rel="stylesheet" href="/styles.css?v=20261009-us-gainers-v1">
 </head>
 <body>
   <main class="shell stock-shell">
@@ -16,7 +16,7 @@
 
     <header class="hero stock-hero">
       <div>
-        <p class="eyebrow">INTERACTIVE BROKERS / ASX</p>
+        <p class="eyebrow">MOOMOO / US · ASX</p>
         <h1>Investment Portfolio<br><span>Stock</span></h1>
       </div>
       <div class="refresh-box">
@@ -24,6 +24,80 @@
         <div><strong id="ibkrState">Checking gateway</strong><small id="stockUpdated">Not loaded</small></div>
       </div>
     </header>
+
+    <section class="stock-panel moomoo-panel" aria-labelledby="holdingsHeading">
+      <div class="stock-panel-head"><div><p class="label">MY MOOMOO / ALL MARKETS</p><h2 id="holdingsHeading">My holdings</h2></div><button id="refreshHoldings" type="button">Refresh holdings</button></div>
+      <label class="moomoo-account-label" for="holdingsAccount">Holdings account<select id="holdingsAccount" disabled><option value="">Connect Moomoo first</option></select></label>
+      <p id="holdingsStatus" class="data-note" role="status" aria-live="polite">Connect Moomoo below to load your holdings.</p>
+      <div class="stock-table-wrap"><table class="stock-table"><thead><tr><th>Stock</th><th>Shares / available</th><th>Cost basis / share</th><th>Current price</th><th>Current value</th><th>Gain / loss since cost basis</th><th>Change %</th><th>Purchase date</th><th>Actions</th></tr></thead>
+      <tbody id="holdingsRows"><tr><td colspan="9" class="empty-stock-row">Your holdings will appear after Moomoo authorization.</td></tr></tbody></table></div>
+      <p id="holdingsNote" class="data-note">Change uses Moomoo's reported cost basis. Purchase dates are not supplied by the positions API. Buy/Sell prepares an order for your review.</p>
+    </section>
+
+    <section class="stock-panel moomoo-panel" aria-labelledby="usGainersHeading">
+      <div class="stock-panel-head"><div><p class="label">MOOMOO / US STOCKS / TRADING DAY</p><h2 id="usGainersHeading">Top 50 gainers</h2></div><button id="refreshUsGainers" type="button">Refresh gainers</button></div>
+      <p id="usGainersStatus" class="data-note" role="status" aria-live="polite">Connect Moomoo to load the US ranking.</p>
+      <div class="stock-table-wrap us-gainers-scroll"><table class="stock-table us-gainers-table"><thead><tr><th>#</th><th><button type="button" data-gainer-sort="symbol">Stock</button></th><th><button type="button" data-gainer-sort="threeDayAverage">3D avg</button></th><th><button type="button" data-gainer-sort="previousDay">Prev day</button></th><th><button type="button" data-gainer-sort="dayBefore">Day before</button></th><th><button type="button" data-gainer-sort="dayChange">Day %</button></th><th><button type="button" data-gainer-sort="hourChange">1H</button></th><th><button type="button" data-gainer-sort="price">Price (USD)</button></th><th>Quote time (New York)</th></tr></thead><tbody id="usGainersRows"><tr><td colspan="9" class="empty-stock-row">US stock ranking will appear after Moomoo authorization.</td></tr></tbody></table></div>
+      <p id="usGainersNote" class="data-note">Day change uses the previous session's close. 1H uses completed regular-session candles. Click a stock to load its details.</p>
+    </section>
+
+    <section class="stock-panel moomoo-panel" aria-labelledby="usStocksHeading">
+      <div class="stock-panel-head">
+        <div><p class="label">MOOMOO / UNITED STATES / USD</p><h2 id="usStocksHeading">US stock details</h2></div>
+        <button id="connectMoomoo" type="button">Connect Moomoo</button>
+      </div>
+      <p id="moomooConnection" class="data-note" role="status" aria-live="polite">Checking Moomoo connection…</p>
+      <form id="usStocksForm" class="moomoo-quote-form">
+        <label for="usSymbols">US stock symbols<input id="usSymbols" value="AAPL,MSFT,NVDA,AMZN,GOOGL,META,TSLA,AVGO,JPM,WMT" maxlength="250" required></label>
+        <button id="refreshUsStocks" type="submit">Load stock details</button>
+      </form>
+      <p id="usStockNote" class="data-note">Enter up to 20 tickers. Prices are USD. Quote time and trading date come from Moomoo; live-feed entitlement must be verified.</p>
+      <div id="usStockError" class="gateway-message" role="alert" hidden></div>
+      <div class="stock-table-wrap"><table class="stock-table">
+        <thead><tr><th>Symbol</th><th>Company</th><th>Last (USD)</th><th>Day change</th><th>Bid</th><th>Ask</th><th>Volume</th><th>Day range</th><th>52-week range</th><th>Market cap</th><th>P/E (TTM)</th><th>Quote time (New York)</th></tr></thead>
+        <tbody id="usStockRows"><tr><td colspan="12" class="empty-stock-row">Connect Moomoo to retrieve US stock details.</td></tr></tbody>
+      </table></div>
+    </section>
+
+    <section class="live-trade-panel" aria-labelledby="moomooTradeHeading">
+      <div class="stock-panel-head"><div><p class="label">MOOMOO / US STOCK ORDERS</p><h2 id="moomooTradeHeading">Live trading</h2></div><button id="enableMoomooTrading" type="button" disabled>Enable live trading</button></div>
+      <p id="moomooTradingStatus" class="live-trade-warning" role="status" aria-live="polite">Locked until Moomoo authorization and a production account are verified. Enabling trading submits no order.</p>
+      <label class="moomoo-account-label" for="moomooAccount">Authorized US account<select id="moomooAccount" disabled><option value="">Connect Moomoo first</option></select></label>
+      <p class="data-note">Whole-share LIMIT orders, valid for the day during regular US trading hours. Maximum US$10,000 per order, before fees. Review each order before sending it.</p>
+      <div class="live-trade-grid">
+        <form class="live-trade-card buy-card moomoo-order-form" data-side="BUY">
+          <h3>Buy US stock</h3><fieldset disabled><label>Stock symbol<input name="symbol" value="AAPL" maxlength="10" required></label><label>Shares<input name="quantity" type="number" min="1" max="10000" step="1" value="1" required></label><label>Limit price (USD)<input name="limitPrice" type="number" min="0.0001" step="0.0001" required></label><button type="submit">Review buy order</button></fieldset>
+        </form>
+        <form class="live-trade-card sell-card moomoo-order-form" data-side="SELL">
+          <h3>Sell US stock</h3><fieldset disabled><label>Stock symbol<input name="symbol" value="AAPL" maxlength="10" required></label><label>Shares<input name="quantity" type="number" min="1" max="10000" step="1" value="1" required></label><label>Limit price (USD)<input name="limitPrice" type="number" min="0.0001" step="0.0001" required></label><button type="submit">Review sell order</button></fieldset>
+        </form>
+      </div>
+      <div id="moomooOrderReview" class="moomoo-review" hidden>
+        <h3>Review real-money order</h3><p id="moomooReviewDetails"></p><p id="moomooReviewExpiry" class="data-note"></p>
+        <button id="submitMoomooOrder" type="button">Confirm and send real order</button><button id="cancelMoomooReview" type="button">Discard review</button>
+      </div>
+      <p id="moomooOrderResult" class="data-note" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="stock-panel" aria-labelledby="asxRisersHeading">
+      <div class="stock-panel-head">
+        <div>
+          <p class="label">AUSTRALIA / S&amp;P/ASX 200</p>
+          <h2 id="asxRisersHeading">Top 10 risers today</h2>
+        </div>
+        <button id="refreshAsxRisers" type="button">Refresh risers</button>
+      </div>
+      <p class="data-note">ASX 200 members ranked by percentage gain from the previous trading session's close. Prices in AUD; quote times use Sydney time.</p>
+      <p id="asxRisersStatus" class="data-note" role="status" aria-live="polite">Checking Australian market-data availability…</p>
+      <div id="asxRisersError" class="gateway-message" role="alert" hidden></div>
+      <div class="stock-table-wrap">
+        <table class="stock-table asx-risers-table">
+          <thead><tr><th>#</th><th>Symbol</th><th>Company</th><th>Last (AUD)</th><th>Day gain</th><th>Volume</th><th>Quote time / feed</th></tr></thead>
+          <tbody id="asxRisersRows"><tr><td colspan="7" class="empty-stock-row">Checking data provider…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="data-note"><a href="https://open.moomoo.com/api/quote/realtime/stock-quote" target="_blank" rel="noopener noreferrer">Moomoo supported quote markets</a></p>
+    </section>
 
     <section class="stock-panel" aria-labelledby="asxHeading">
       <div class="stock-panel-head">
@@ -56,6 +130,8 @@
       <p>This app does not store your Interactive Brokers username or password. Run Client Portal Gateway on a private host, sign in through its browser page, complete MFA, and configure <code>IBKR_GATEWAY_BASE_URL</code> to a URL this server can reach. Azure cannot call a gateway running only on your home computer unless you provide a secure private connection.</p>
     </section>
   </main>
-  <script src="/stocks.js?v=20261001-stock-tabs-v1"></script>
+  <script src="/stocks.js?v=20261009-all-holdings-v1"></script>
+  <script src="/moomoo.js?v=20261009-all-holdings-v1"></script>
+  <script src="/stock-gainers.js?v=20261009-us-gainers-v1"></script>
 </body>
 </html>
