@@ -262,3 +262,28 @@ fields remain unavailable. The positions API does not provide purchase dates;
 reported diluted cost may include prior sales, so this is not a date-specific
 purchase return. Buy/Sell selects the holding and account in the existing reviewed
 order form. It does not submit an order or bypass the production/trading gates.
+
+## BTC Markets
+
+The BTC tab opens `/btc.html`: all exchange markets ranked by 24-hour quote volume
+converted to AUD, wallet balances, and immediate-or-cancel limit Buy/Sell panels.
+Wallet Sell fills the available amount in the AUD sell panel; submission requires
+an explicit confirmation. Limit prices can prevent a fill; partial fills are possible.
+Public market data needs no key. Private requests use Base64-secret HMAC-SHA512
+signatures on the server, with no credentials sent to the browser.
+
+Set these in the hosting environment before starting the app (or use matching
+`BtcMarkets:ApiKey`, `BtcMarkets:ApiSecret`, `BtcMarkets:LiveTradingEnabled` user secrets):
+
+```powershell
+$env:BTCMARKETS_API_KEY = "your-public-key"
+$env:BTCMARKETS_API_SECRET = "your-base64-secret"
+$env:BTCMARKETS_LIVE_TRADING_ENABLED = "true"
+```
+
+Read-only account permission is enough for wallet access. Trading also requires
+Trade read/write permission. Withdrawals are not used. Live trading defaults off.
+Order submissions validate CSRF, market precision, limits and available balances.
+Each client order ID is submitted once per app process, with no automatic retries.
+After a timeout, reconcile that client ID in BTC Markets before submitting again.
+Credentials and user-specific local configuration must never be committed.

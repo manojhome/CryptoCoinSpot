@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>BTC Markets | Portfolio</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/btc.css"><script src="/btc.js" defer></script></head>
+<body><main class="shell">
+<nav class="asset-tabs" aria-label="Portfolio markets"><a href="/">Crypto</a><a href="/stocks.html">Stock</a><a class="active" aria-current="page" href="/btc.html">BTC</a></nav>
+<header class="hero"><div><p class="eyebrow">BTC MARKETS / LIVE EXCHANGE</p><h1>Markets &amp; wallet</h1></div><button id="refresh" type="button">Refresh</button></header>
+<p id="connection" role="status">Checking connection…</p>
+<div class="btc-panels">
+<section class="chart-card"><div class="card-head"><h2>Crypto prices</h2><label>Find market <input id="search" placeholder="BTC, ETH…" type="search"></label></div><p class="data-note">All BTC Markets pairs. Highest 24-hour trading value first, converted to AUD for comparison. Select Buy or Sell to fill an order panel. Prices refresh every 30 seconds.</p><p id="marketStatus" role="status">Loading prices…</p><div class="btc-scroll"><table><thead><tr><th>Market</th><th>Last price (quote)</th><th>24h change</th><th>24h value (AUD)</th><th>Trade</th></tr></thead><tbody id="markets"></tbody></table></div></section>
+<section class="chart-card"><h2>My BTC Markets wallet</h2><p class="data-note">Sell selects the AUD market and fills your available balance. Locked funds cannot be sold.</p><p id="walletStatus" role="status">Loading wallet…</p><div class="btc-scroll"><table><thead><tr><th>Asset</th><th>Balance</th><th>Available</th><th>Locked</th><th>AUD value</th><th>Action</th></tr></thead><tbody id="wallet"></tbody></table></div></section>
+</div>
+<section class="live-trade-panel"><h2>Buy &amp; sell</h2><p class="data-note">Orders use your limit price and execute immediately against matching orders. Any unfilled amount is cancelled (IOC). A partial fill is possible. Buy quantities are in coins; fees are additional. Check exchange history after an uncertain result.</p><div class="live-trade-grid" id="forms"></div></section>
+</main></body></html>

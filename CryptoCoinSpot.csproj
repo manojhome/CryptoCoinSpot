@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
     <Content Remove="tests/**;artifacts/**;Data/moomoo-keys/**;Data/moomoo*.json;Data/moomoo*.tmp" />
     <None Remove="tests/**;artifacts/**;Data/moomoo-keys/**;Data/moomoo*.json;Data/moomoo*.tmp" />
   </ItemGroup>

@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true).AddEnvironmentVariables();
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 builder.Services.AddMemoryCache();
 builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-Token");
@@ -63,6 +64,7 @@ builder.Services.AddHttpClient<IbkrMarketDataClient>(client =>
     return handler;
 });
 
+builder.Services.AddHttpClient<BtcMarketsClient>(client => { client.BaseAddress = new Uri("https://api.btcmarkets.net"); client.Timeout = TimeSpan.FromSeconds(25); });
 var app = builder.Build();
 const string sitePassword = "TEST1234789!";
 const string accessCookieName = "CryptoCoinSpotAccess";
@@ -700,6 +702,7 @@ app.MapGet("/api/ibkr/asx/top", async (
 });
 
 app.MapMoomoo();
+app.MapBtcMarkets();
 
 // Data files are server-side storage only. They must never be served directly,
 // even to an authenticated browser; callers use the protected API routes.
