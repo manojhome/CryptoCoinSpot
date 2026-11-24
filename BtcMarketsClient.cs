@@ -30,7 +30,26 @@ public sealed class BtcMarketsClient(HttpClient http, IConfiguration config, IMe
             request.Headers.Add("BM-AUTH-SIGNATURE", signature);
         }
         using var response = await http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"BTC Markets returned {(int)response.StatusCode}. Check API permissions and account status.");
+        if (!response.IsSuccessStatusCode)
+        {
+            var reason = $"BTC Markets returned {(int)response.StatusCode}. Check API permissions and account status.";
+            try
+            {
+                var error = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct));
+                var code = error?["code"]?.ToString();
+                var message = error?["message"]?.ToString() ?? "";
+                // Map known failures without exposing arbitrary upstream response text.
+                if (code == "InsufficientAPIPermission")
+                    reason = message.Contains("ip address", StringComparison.OrdinalIgnoreCase)
+                        ? "BTC Markets blocked this server's IP address. Update the API key's allowed IP addresses in BTC Markets to include this Azure app's outbound IPs, then save the key settings."
+                        : "BTC Markets denied this API key permission. Enable Account read access for wallet balances in the API key settings.";
+                else if (code is "AuthenticationFailed" or "InvalidAPIKey" || response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    reason = "BTC Markets authentication failed. Check that the API key and secret in Azure belong to the same active key pair.";
+            }
+            catch (System.Text.Json.JsonException) { }
+            catch (InvalidOperationException) { }
+            throw new InvalidOperationException(reason);
+        }
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(ct)) ?? throw new InvalidOperationException("Empty exchange response.");
     }
     public async Task<JsonArray> Markets(CancellationToken ct)
